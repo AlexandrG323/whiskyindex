@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: whiskyindex_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-whisky}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-whisky}
+      POSTGRES_DB: ${POSTGRES_DB:-whiskyindex}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
