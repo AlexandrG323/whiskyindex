@@ -1,0 +1,26 @@
+{
+  "name": "whiskyindex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Whisky Index monorepo — frontend + backend",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "prepare": "husky",
+    "lint": "biome check --error-on-warnings .",
+    "lint:fix": "biome check --write --error-on-warnings .",
+    "format": "biome format --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run lint && npm run typecheck"
+  },
+  "lint-staged": {
+    "*": "biome check --write --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  }
+}

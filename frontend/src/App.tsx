@@ -1,22 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 
-type Product = { id: string; name: string };
-type Stock = { ticker: string; name: string };
+type Product = { id: string; name: string }
+type Stock = { ticker: string; name: string }
 
 export default function App() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [products, setProducts] = useState<Product[]>([])
+  const [stocks, setStocks] = useState<Stock[]>([])
 
   useEffect(() => {
     fetch('/api/products')
       .then((r) => r.json())
       .then(setProducts)
-      .catch(() => setProducts([]));
+      .catch(() => setProducts([]))
     fetch('/api/stocks')
       .then((r) => r.json())
       .then(setStocks)
-      .catch(() => setStocks([]));
-  }, []);
+      .catch(() => setStocks([]))
+  }, [])
 
   return (
     <main>
@@ -43,5 +43,5 @@ export default function App() {
         </ul>
       </section>
     </main>
-  );
+  )
 }

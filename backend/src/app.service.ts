@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common'
 
 // TODO: заменить статические списки на данные из Postgres и внешнего API котировок.
 @Injectable()
@@ -18,7 +18,7 @@ export class AppService {
       { id: 'winston', name: 'Сигареты Winston' },
       { id: 'sausage_smoked', name: 'Копчёная колбаса' },
       { id: 'mayo', name: 'Майонез' },
-    ];
+    ]
   }
 
   getDefaultStocks() {
@@ -34,6 +34,6 @@ export class AppService {
       { ticker: 'MCD', name: "McDonald's" },
       { ticker: 'SPX', name: 'S&P 500' },
       { ticker: 'PM', name: 'Philip Morris' },
-    ];
+    ]
   }
 }
