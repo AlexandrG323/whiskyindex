@@ -23,6 +23,9 @@ Apple, S&P 500...).
 
 ```
 whiskyindex/
+├── package.json     # npm workspaces + Biome / Husky / lint-staged
+├── biome.json       # lint + format (единый конфиг)
+├── .husky/          # pre-commit / pre-push
 ├── frontend/        # React (TypeScript, Vite) — UI, графики, сравнение
 ├── backend/         # NestJS (TypeScript) — API, цены продуктов из БД, данные об акциях
 ├── docker-compose.yml  # Postgres для локальной разработки
@@ -36,28 +39,58 @@ whiskyindex/
 | Frontend  | React + TypeScript (Vite)                                          |
 | Backend   | NestJS + TypeScript                                                |
 | Database  | PostgreSQL                                                         |
+| Lint/format | Biome                                                              |
+| Git hooks | Husky + lint-staged                                                |
 | Внешние   | Сторонний API котировок акций                                      |
 
 ## Быстрый старт
 
 ```bash
-# 1. Поднять Postgres
+# 1. Установка зависимостей (из корня монорепо)
+#    prepare → husky: ставит Git hooks (pre-commit / pre-push)
+npm install
+
+# Проверка, что hooks подключены (должно быть .husky/_):
+#   git config --get core.hooksPath
+
+# Если hooks не сработали (редко) — переустановить вручную:
+#   npx husky
+
+# 2. Поднять Postgres
 cp .env.example .env
 docker compose up -d
 
-# 2. Backend
+# 3. Backend
 cd backend
 cp .env.example .env
-npm install
 npm run start:dev        # http://localhost:3000
 
-# 3. Frontend (в другом терминале)
+# 4. Frontend (в другом терминале, из корня)
 cd frontend
-npm install
 npm run dev              # http://localhost:5173
 ```
 
 Подробности — в `frontend/README.md` и `backend/README.md`.
+
+## Lint & hooks
+
+После `npm install` из корня Husky включает hooks автоматически (`prepare`).
+
+| Hook | Когда | Что делает |
+| ---- | ----- | ---------- |
+| **pre-commit** | `git commit` | `lint-staged` → Biome по staged-файлам; ошибки и warnings блокируют commit |
+| **pre-push** | `git push` | `npm run check` (полный lint + typecheck); блокирует push |
+
+Из корня вручную:
+
+```bash
+npm run lint        # Biome: ошибки и warnings блокируют
+npm run lint:fix   # автофиксы
+npm run typecheck   # tsc --noEmit в frontend и backend
+npm run check       # lint + typecheck (то же, что pre-push)
+```
+
+Обойти hooks можно только явно (`git commit --no-verify` / `HUSKY=0`) — так делать не стоит.
 
 ## Статус
 

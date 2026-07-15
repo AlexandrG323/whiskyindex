@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { Controller, Get } from '@nestjs/common'
+import { AppService } from './app.service'
 
 @Controller()
 export class AppController {
@@ -7,18 +7,18 @@ export class AppController {
 
   @Get('health')
   health() {
-    return { status: 'ok' };
+    return { status: 'ok' }
   }
 
   // Стандартный список продуктов (виден без авторизации)
   @Get('products')
   getProducts() {
-    return this.appService.getDefaultProducts();
+    return this.appService.getDefaultProducts()
   }
 
   // Стандартный набор акций (2007)
   @Get('stocks')
   getStocks() {
-    return this.appService.getDefaultStocks();
+    return this.appService.getDefaultStocks()
   }
 }
