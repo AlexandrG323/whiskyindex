@@ -29,11 +29,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
-      PORT: 3000
+      # Always reach Postgres via the compose service name (overrides localhost in backend/.env).
       DATABASE_URL: postgresql://${POSTGRES_USER:-whisky}:${POSTGRES_PASSWORD:-whisky}@db:5432/${POSTGRES_DB:-whiskyindex}
-      STOCKS_API_URL: ${STOCKS_API_URL:-}
-      STOCKS_API_KEY: ${STOCKS_API_KEY:-}
     ports:
       - "3000:3000"
 
