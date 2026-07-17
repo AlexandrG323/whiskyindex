@@ -12,6 +12,7 @@ npm run start:dev
 ```
 
 API поднимется на `http://localhost:3000/api`.
+OpenAPI (Swagger UI): `http://localhost:3000/api/docs`.
 
 ## Эндпоинты (скелет)
 

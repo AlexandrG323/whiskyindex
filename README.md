@@ -53,6 +53,7 @@ docker compose up --build
 ```
 
 Открой **http://localhost:5173** (UI; `/api` проксируется на backend).
+OpenAPI / Swagger UI: **http://localhost:3000/api/docs** (или через UI: **http://localhost:5173/api/docs**).
 API напрямую: **http://localhost:3000/api**.
 
 ## Локальная разработка (npm + только Postgres в Docker)
