@@ -28,7 +28,7 @@ whiskyindex/
 ├── .husky/          # pre-commit / pre-push
 ├── frontend/        # React (TypeScript, Vite) — UI, графики, сравнение
 ├── backend/         # NestJS (TypeScript) — API, цены продуктов из БД, данные об акциях
-├── docker-compose.yml  # Postgres для локальной разработки
+├── docker-compose.yml  # Postgres + API + frontend
 └── README.md
 ```
 
@@ -43,7 +43,19 @@ whiskyindex/
 | Git hooks | Husky + lint-staged                                                |
 | Внешние   | Сторонний API котировок акций                                      |
 
-## Быстрый старт
+## Быстрый старт (Docker)
+
+Поднимает Postgres, API и frontend одной командой:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Открой **http://localhost:5173** (UI; `/api` проксируется на backend).
+API напрямую: **http://localhost:3000/api**.
+
+## Локальная разработка (npm + только Postgres в Docker)
 
 ```bash
 # 1. Установка зависимостей (из корня монорепо)
@@ -56,9 +68,9 @@ npm install
 # Если hooks не сработали (редко) — переустановить вручную:
 #   npx husky
 
-# 2. Поднять Postgres
+# 2. Поднять только Postgres
 cp .env.example .env
-docker compose up -d
+docker compose up -d db
 
 # 3. Backend
 cd backend

@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+.git
+.husky
+.env
+.env.*
+!.env.example
+*.log
+coverage
+.DS_Store
+pgdata

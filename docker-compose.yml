@@ -11,6 +11,39 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whisky} -d ${POSTGRES_DB:-whiskyindex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: whiskyindex_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-whisky}:${POSTGRES_PASSWORD:-whisky}@db:5432/${POSTGRES_DB:-whiskyindex}
+      STOCKS_API_URL: ${STOCKS_API_URL:-}
+      STOCKS_API_KEY: ${STOCKS_API_KEY:-}
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: whiskyindex_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
 
 volumes:
   pgdata:
