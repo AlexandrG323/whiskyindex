@@ -11,6 +11,9 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Schema + demo seed on first boot only (empty volume).
+      # Re-seed anytime: ./db/seed.sh
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whisky} -d ${POSTGRES_DB:-whiskyindex}"]
       interval: 5s

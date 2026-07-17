@@ -28,6 +28,7 @@ whiskyindex/
 ├── .husky/          # pre-commit / pre-push
 ├── frontend/        # React (TypeScript, Vite) — UI, графики, сравнение
 ├── backend/         # NestJS (TypeScript) — API, цены продуктов из БД, данные об акциях
+├── db/              # Postgres schema + demo seed (init on first boot)
 ├── docker-compose.yml  # Postgres + API + frontend
 └── README.md
 ```
@@ -56,6 +57,10 @@ docker compose up --build
 OpenAPI / Swagger UI: **http://localhost:3000/api/docs** (или через UI: **http://localhost:5173/api/docs**).
 API напрямую: **http://localhost:3000/api**.
 
+На первом старте Postgres применяет схему и демо-сид из `db/init/`
+(акции, продукты, цены 2007–2026, курсы USD/RUB). Если том `pgdata` уже есть —
+пересид: `./db/seed.sh` (или `docker compose down -v && docker compose up --build` для чистого старта).
+
 ## Локальная разработка (npm + только Postgres в Docker)
 
 ```bash
@@ -69,9 +74,11 @@ npm install
 # Если hooks не сработали (редко) — переустановить вручную:
 #   npx husky
 
-# 2. Поднять только Postgres
+# 2. Поднять только Postgres (+ схема/сид на пустом томе)
 cp .env.example .env
 docker compose up -d db
+# если том уже был — накатить демо-данные:
+npm run db:seed
 
 # 3. Backend
 cd backend
