@@ -5,6 +5,13 @@ export class HealthResponseDto {
   status!: string
 }
 
+export class ProductYearlyPriceDto {
+  id!: string
+  name!: string
+  yearlyPrice!: number
+  currency!: string
+}
+
 export class ProductDto {
   @ApiProperty({ example: 'jameson' })
   id!: string
