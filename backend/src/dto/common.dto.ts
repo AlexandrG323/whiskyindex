@@ -6,9 +6,16 @@ export class HealthResponseDto {
 }
 
 export class ProductYearlyPriceDto {
+  @ApiProperty({ example: 'prod-42' })
   id!: string
+
+  @ApiProperty({ example: 'Виски Jameson 0.7' })
   name!: string
+
+  @ApiProperty({ example: 1850 })
   yearlyPrice!: number
+
+  @ApiProperty({ example: 'rub', enum: ['rub', 'usd'] })
   currency!: string
 }
 

@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common'
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { ProductsService, ProductYearlyPriceDto } from './products.service'
+import { Controller, Get, Query } from '@nestjs/common'
+import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { ProductYearlyPriceDto } from '../dto/common.dto'
+import { ProductsService } from './products.service'
 
 /**
  * Products API surface (SPEC.md → GET /api/v1/products/...).
@@ -18,13 +19,24 @@ export class ProductsController {
   @Get('cart')
   @ApiOperation({
     summary: 'Product cart for year + currency',
-    description: 'Not implemented yet — returns 501.',
+    description: 'Returns a mock cart item for the selected year and currency.',
   })
-  @ApiQuery({ name: 'year', required: false, example: 2007 })
-  @ApiQuery({ name: 'currency', required: false, enum: ['rub', 'usd'], example: 'rub' })
-  @ApiResponse({ status: 501, description: 'Not implemented yet' })
-  getCart(): ProductYearlyPriceDto {
-    // TODO: parse year / currency query params, then delegate
-    return this.productsService.getCart()
+  @ApiQuery({ name: 'year', required: false, type: Number, example: 2007 })
+  @ApiQuery({
+    name: 'currency',
+    required: false,
+    enum: ['rub', 'usd'],
+    example: 'rub',
+  })
+  @ApiOkResponse({ type: ProductYearlyPriceDto })
+  getCart(
+    @Query('year') year?: string,
+    @Query('currency') currency?: 'rub' | 'usd',
+  ): ProductYearlyPriceDto {
+    const parsedYear = year ? Number(year) : 2007
+    return this.productsService.getCart(
+      Number.isFinite(parsedYear) ? parsedYear : 2007,
+      currency === 'usd' ? 'usd' : 'rub',
+    )
   }
 }
