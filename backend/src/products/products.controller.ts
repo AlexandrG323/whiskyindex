@@ -19,7 +19,7 @@ export class ProductsController {
   @Get('cart')
   @ApiOperation({
     summary: 'Product cart for year + currency',
-    description: 'Returns a mock cart item for the selected year and currency.',
+    description: 'Returns seeded basket products with yearly average prices from Postgres.',
   })
   @ApiQuery({ name: 'year', required: false, type: Number, example: 2007 })
   @ApiQuery({
@@ -28,11 +28,11 @@ export class ProductsController {
     enum: ['rub', 'usd'],
     example: 'rub',
   })
-  @ApiOkResponse({ type: ProductYearlyPriceDto })
+  @ApiOkResponse({ type: ProductYearlyPriceDto, isArray: true })
   getCart(
     @Query('year') year?: string,
     @Query('currency') currency?: 'rub' | 'usd',
-  ): ProductYearlyPriceDto {
+  ): Promise<ProductYearlyPriceDto[]> {
     const parsedYear = year ? Number(year) : 2007
     return this.productsService.getCart(
       Number.isFinite(parsedYear) ? parsedYear : 2007,

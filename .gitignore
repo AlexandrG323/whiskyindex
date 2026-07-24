@@ -37,3 +37,6 @@ coverage/
 
 # Postgres volume (if bind-mounted locally)
 pgdata/
+
+
+secrets.txt
