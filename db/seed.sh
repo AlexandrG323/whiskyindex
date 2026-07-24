@@ -23,6 +23,10 @@ echo "Seeding demo data..."
 docker compose -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <"$INIT_DIR/02_seed.sql"
 
+echo "Seeding historical product prices..."
+docker compose -f "$COMPOSE_FILE" exec -T db \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <"$INIT_DIR/03_product_prices.sql"
+
 echo "Done. Sample counts:"
 docker compose -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \

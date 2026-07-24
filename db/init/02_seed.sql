@@ -102,37 +102,7 @@ ON CONFLICT (id) DO UPDATE SET
   category = EXCLUDED.category,
   image_url = EXCLUDED.image_url;
 
--- Product prices 2007–2026 in RUB (synthetic inflation ~8%/yr)
-WITH bases (product_id, base_price) AS (
-  VALUES
-    ('22222222-2222-4222-8222-222222222001'::uuid, 650.00),   -- Jameson
-    ('22222222-2222-4222-8222-222222222002'::uuid,  45.00),   -- Cola
-    ('22222222-2222-4222-8222-222222222003'::uuid,  90.00),   -- Sausages
-    ('22222222-2222-4222-8222-222222222004'::uuid, 110.00),   -- Pelmeni
-    ('22222222-2222-4222-8222-222222222005'::uuid, 180.00),   -- Jacobs
-    ('22222222-2222-4222-8222-222222222006'::uuid,  18.00),   -- Doshirak
-    ('22222222-2222-4222-8222-222222222007'::uuid,  40.00),   -- Cucumbers
-    ('22222222-2222-4222-8222-222222222008'::uuid,  25.00),   -- Charcoal
-    ('22222222-2222-4222-8222-222222222009'::uuid,  55.00),   -- Borjomi
-    ('22222222-2222-4222-8222-222222222010'::uuid,  20.00),   -- Potato
-    ('22222222-2222-4222-8222-222222222011'::uuid,  50.00),   -- Winston
-    ('22222222-2222-4222-8222-222222222012'::uuid, 220.00),   -- Smoked sausage
-    ('22222222-2222-4222-8222-222222222013'::uuid,  35.00)    -- Mayo
-),
-years AS (
-  SELECT generate_series(2007, 2026) AS year
-)
-INSERT INTO product_prices (product_id, year, average_price, currency)
-SELECT
-  b.product_id,
-  y.year,
-  round((b.base_price * power(1.08, y.year - 2007))::numeric, 6),
-  'RUB'
-FROM bases b
-CROSS JOIN years y
-ON CONFLICT (product_id, year) DO UPDATE SET
-  average_price = EXCLUDED.average_price,
-  currency = EXCLUDED.currency;
+-- Product prices: see 03_product_prices.sql
 
 -- ---------------------------------------------------------------------------
 -- USD/RUB average yearly rates (approximate fixtures)
