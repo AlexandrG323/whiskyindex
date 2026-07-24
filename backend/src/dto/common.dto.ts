@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class HealthResponseDto {
   @ApiProperty({ example: 'ok' })
@@ -6,17 +6,24 @@ export class HealthResponseDto {
 }
 
 export class ProductYearlyPriceDto {
-  @ApiProperty({ example: 'prod-42' })
+  @ApiProperty({ example: '22222222-2222-4222-8222-222222222001' })
   id!: string
 
   @ApiProperty({ example: 'Виски Jameson 0.7' })
   name!: string
 
-  @ApiProperty({ example: 1850 })
-  yearlyPrice!: number
+  @ApiPropertyOptional({
+    example: null,
+    nullable: true,
+    type: String,
+  })
+  imageUrl!: string | null
 
-  @ApiProperty({ example: 'rub', enum: ['rub', 'usd'] })
-  currency!: string
+  @ApiProperty({ example: 650 })
+  price!: number
+
+  @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
+  currency!: 'RUB' | 'USD'
 }
 
 export class ProductDto {
