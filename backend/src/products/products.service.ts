@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
 import { ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
@@ -83,6 +83,12 @@ export class ProductsService {
       year: number
       price: string
       currency: 'RUB' | 'USD'
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+    if (!uuidRegex.test(id)) {
+      throw new BadRequestException('Invalid UUID')
     }
 
     const { rows } = await this.pool.query<HistoryRow>(
