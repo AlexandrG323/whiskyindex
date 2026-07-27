@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, NotImplementedException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
 import { ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
@@ -69,15 +69,66 @@ export class ProductsService {
    * Try: GET /api/v1/products/22222222-2222-4222-8222-222222222001/history?from=2007&to=2010
    */
   async getHistory(
-    _id: string,
-    _from = 2007,
-    _to = 2026,
-    _currency: 'rub' | 'usd' = 'rub',
+    id: string,
+    from = 2007,
+    to = 2026,
+    currency: 'rub' | 'usd' = 'rub',
   ): Promise<ProductHistoryDto> {
-    // TODO: implement with this.pool.query(...) — SQL only, no external APIs
-    void this.pool
-    throw new NotImplementedException(
-      'getHistory is a skeleton — implement the SQL query (see getCart for the pattern)',
+    const targetCurrency = currency === 'usd' ? 'USD' : 'RUB'
+
+    type HistoryRow = {
+      id: string
+      name: string
+      image_url: string | null
+      year: number
+      price: string
+      currency: 'RUB' | 'USD'
+    }
+
+    const { rows } = await this.pool.query<HistoryRow>(
+      `
+      SELECT
+        p.id,
+        p.name,
+        p.image_url,
+        pp.year,
+        CASE
+          WHEN $4::text = 'USD' THEN round(pp.average_price / er.rate, 6)
+          ELSE pp.average_price
+        END AS price,
+        $4::text AS currency
+      FROM products p
+      JOIN product_prices pp
+        ON pp.product_id = p.id
+       AND pp.year BETWEEN $2 AND $3
+      LEFT JOIN exchange_rates er
+        ON er.year = pp.year
+       AND er.base_currency = 'USD'
+       AND er.quote_currency = 'RUB'
+      WHERE p.id = $1
+        AND ($4::text = 'RUB' OR er.rate IS NOT NULL)
+      ORDER BY pp.year ASC
+      `,
+      [id, from, to, targetCurrency],
     )
+
+    if (rows.length === 0) {
+      throw new NotFoundException(
+        `Product with id "${id}" not found or has no prices for period ${from}-${to}`,
+      )
+    }
+
+    const [firstRow] = rows
+
+    return {
+      id: firstRow.id,
+      name: firstRow.name,
+      imageUrl: firstRow.image_url,
+      currency: firstRow.currency,
+      prices: rows.map((row) => ({
+        year: row.year,
+        amount: Number(row.price),
+      })),
+    }
   }
 }
