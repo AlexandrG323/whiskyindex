@@ -26,6 +26,35 @@ export class ProductYearlyPriceDto {
   currency!: 'RUB' | 'USD'
 }
 
+export class ProductHistoryPricePointDto {
+  @ApiProperty({ example: 2007 })
+  year!: number
+
+  @ApiProperty({ example: 650, description: 'Average price in the requested currency' })
+  amount!: number
+}
+
+export class ProductHistoryDto {
+  @ApiProperty({ example: '22222222-2222-4222-8222-222222222001' })
+  id!: string
+
+  @ApiProperty({ example: 'Виски Jameson 0.7' })
+  name!: string
+
+  @ApiPropertyOptional({
+    example: null,
+    nullable: true,
+    type: String,
+  })
+  imageUrl!: string | null
+
+  @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
+  currency!: 'RUB' | 'USD'
+
+  @ApiProperty({ type: ProductHistoryPricePointDto, isArray: true })
+  prices!: ProductHistoryPricePointDto[]
+}
+
 export class ProductDto {
   @ApiProperty({ example: 'jameson' })
   id!: string

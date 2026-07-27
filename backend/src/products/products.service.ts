@@ -1,7 +1,7 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException, NotImplementedException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
-import { ProductYearlyPriceDto } from '../dto/common.dto'
+import { ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
 
 type CartRow = {
   id: string
@@ -53,5 +53,31 @@ export class ProductsService {
       price: Number(row.price),
       currency: row.currency,
     }))
+  }
+
+  /**
+   * Price history for one product over a year range.
+   *
+   * Hints (copy patterns from getCart above):
+   * 1. SELECT from `products` JOIN `product_prices` WHERE product id = $1
+   *    AND year BETWEEN $2 AND $3
+   * 2. Convert RUB → USD with `exchange_rates` the same way getCart does
+   * 3. ORDER BY year ASC
+   * 4. If the product does not exist or has no prices → throw NotFoundException
+   * 5. Return ProductHistoryDto: { id, name, imageUrl, currency, prices: [{ year, amount }] }
+   *
+   * Try: GET /api/v1/products/22222222-2222-4222-8222-222222222001/history?from=2007&to=2010
+   */
+  async getHistory(
+    _id: string,
+    _from = 2007,
+    _to = 2026,
+    _currency: 'rub' | 'usd' = 'rub',
+  ): Promise<ProductHistoryDto> {
+    // TODO: implement with this.pool.query(...) — SQL only, no external APIs
+    void this.pool
+    throw new NotImplementedException(
+      'getHistory is a skeleton — implement the SQL query (see getCart for the pattern)',
+    )
   }
 }
