@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
-import { ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
+import { ProductDto, ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
 
 type CartRow = {
   id: string
@@ -14,6 +14,16 @@ type CartRow = {
 @Injectable()
 export class ProductsService {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
+
+  async getProductsList(): Promise<ProductDto[]> {
+    type ProductRow = {
+      id: string
+      name: string
+    }
+    const { rows } = await this.pool.query<ProductRow>(`SELECT id, name FROM products`)
+    return rows.map((row) => ({ id: row.id, name: row.name }))
+  }
+
   async getCart(year = 2007, currency: 'rub' | 'usd' = 'rub'): Promise<ProductYearlyPriceDto[]> {
     const targetCurrency = currency === 'usd' ? 'USD' : 'RUB'
     const { rows } = await this.pool.query<CartRow>(

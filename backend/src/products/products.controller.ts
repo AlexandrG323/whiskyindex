@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
-import { ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
+import { ProductDto, ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
 import { ProductsService } from './products.service'
 
 /**
@@ -11,6 +11,17 @@ import { ProductsService } from './products.service'
 @Controller('v1/products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
+
+  /**
+   * GET /api/v1/products/list
+   * Product list (no auth)
+   */
+  @Get('list')
+  @ApiOperation({ summary: 'Product list (no auth)' })
+  @ApiOkResponse({ type: ProductDto, isArray: true })
+  getProducts(): Promise<ProductDto[]> {
+    return this.productsService.getProductsList()
+  }
 
   /**
    * GET /api/v1/products/cart?year=&currency=

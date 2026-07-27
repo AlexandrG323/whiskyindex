@@ -56,7 +56,7 @@ export class ProductHistoryDto {
 }
 
 export class ProductDto {
-  @ApiProperty({ example: 'jameson' })
+  @ApiProperty({ example: '22222222-2222-4222-8222-222222222001' })
   id!: string
 
   @ApiProperty({ example: 'Виски Jameson 0.7' })
