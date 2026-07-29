@@ -5,6 +5,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# Local compose: bind-mount source + nest start --watch
+FROM deps AS development
+WORKDIR /app
+COPY . .
+EXPOSE 3000
+ENV NODE_ENV=development
+CMD ["npm", "run", "start:dev"]
+
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules

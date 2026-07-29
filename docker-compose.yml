@@ -24,6 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: development
     container_name: whiskyindex_api
     restart: unless-stopped
     depends_on:
@@ -35,8 +36,15 @@ services:
     environment:
       # Always reach Postgres via the compose service name (overrides localhost in backend/.env).
       DATABASE_URL: postgresql://${POSTGRES_USER:-whisky}:${POSTGRES_PASSWORD:-whisky}@db:5432/${POSTGRES_DB:-whiskyindex}
+      # Bind mounts on Docker Desktop (macOS) need polling for reliable Nest --watch.
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/nest-cli.json:/app/nest-cli.json
+      - ./backend/tsconfig.json:/app/tsconfig.json
 
   frontend:
     build:
