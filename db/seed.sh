@@ -19,7 +19,7 @@ echo "Applying schema..."
 docker compose -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <"$INIT_DIR/01_schema.sql"
 
-echo "Seeding demo data..."
+echo "Seeding demo data (clears stock_prices; curated stocks stay pending)..."
 docker compose -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <"$INIT_DIR/02_seed.sql"
 

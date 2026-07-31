@@ -1,26 +1,33 @@
 -- Demo seed data for local Docker / easy start.
--- Idempotent: safe to re-run. Numbers are approximate fixtures, not live market data.
+-- Idempotent: safe to re-run.
+-- Stock *prices* are NOT seeded — Import Service loads them from MOEX / Yahoo (homework).
 
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- Curated stocks (fixed UUIDs for stable local references)
+-- Wipe synthetic stock prices from older seeds (keep products + FX rates)
+-- ---------------------------------------------------------------------------
+DELETE FROM stock_data_coverage;
+DELETE FROM stock_prices;
+
+-- ---------------------------------------------------------------------------
+-- Curated stocks metadata only (fixed UUIDs). import_status = pending until import.
 -- ---------------------------------------------------------------------------
 INSERT INTO stocks (
   id, symbol, company_name, country, exchange, source, image_url,
   native_currency, is_curated, is_active, import_status, prices_cached_at, image_cached_at
 ) VALUES
-  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', NULL, 'USD', true, true, 'ready', now(), now()),
-  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'ready', now(), now())
+  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL)
 ON CONFLICT (symbol, exchange) DO UPDATE SET
   company_name = EXCLUDED.company_name,
   country = EXCLUDED.country,
@@ -30,55 +37,8 @@ ON CONFLICT (symbol, exchange) DO UPDATE SET
   is_active = EXCLUDED.is_active,
   import_status = EXCLUDED.import_status,
   prices_cached_at = EXCLUDED.prices_cached_at,
+  image_cached_at = EXCLUDED.image_cached_at,
   updated_at = now();
-
--- Yearly stock prices 2007–2026 (synthetic growth from a 2007 base)
-WITH bases (stock_id, base_price, annual_growth) AS (
-  VALUES
-    ('11111111-1111-4111-8111-111111111001'::uuid, 280.000000, 0.045),  -- GAZP RUB
-    ('11111111-1111-4111-8111-111111111002'::uuid,  95.000000, 0.080),  -- SBER
-    ('11111111-1111-4111-8111-111111111003'::uuid, 1800.000000, 0.070), -- LKOH
-    ('11111111-1111-4111-8111-111111111004'::uuid, 4500.000000, 0.060), -- GMKN
-    ('11111111-1111-4111-8111-111111111005'::uuid, 210.000000, 0.055),  -- ROSN
-    ('11111111-1111-4111-8111-111111111006'::uuid,  28.000000, 0.020),  -- AVAZ
-    ('11111111-1111-4111-8111-111111111007'::uuid,  12.500000, 0.180),  -- AAPL USD
-    ('11111111-1111-4111-8111-111111111008'::uuid,  16.000000, 0.140),  -- GOOGL
-    ('11111111-1111-4111-8111-111111111009'::uuid,  50.000000, 0.090),  -- MCD
-    ('11111111-1111-4111-8111-111111111010'::uuid, 1470.000000, 0.080), -- SPX
-    ('11111111-1111-4111-8111-111111111011'::uuid,  45.000000, 0.070)   -- PM
-),
-years AS (
-  SELECT generate_series(2007, 2026) AS year
-),
-currency_map AS (
-  SELECT id AS stock_id, native_currency
-  FROM stocks
-  WHERE id IN (SELECT stock_id FROM bases)
-)
-INSERT INTO stock_prices (stock_id, year, average_price, currency, imported_at)
-SELECT
-  b.stock_id,
-  y.year,
-  round((b.base_price * power(1 + b.annual_growth, y.year - 2007))::numeric, 6),
-  c.native_currency,
-  now()
-FROM bases b
-CROSS JOIN years y
-JOIN currency_map c ON c.stock_id = b.stock_id
-ON CONFLICT (stock_id, year) DO UPDATE SET
-  average_price = EXCLUDED.average_price,
-  currency = EXCLUDED.currency,
-  imported_at = EXCLUDED.imported_at;
-
-INSERT INTO stock_data_coverage (stock_id, year, has_price, imported_at)
-SELECT stock_id, year, true, imported_at
-FROM stock_prices
-WHERE stock_id IN (
-  SELECT id FROM stocks WHERE is_curated
-)
-ON CONFLICT (stock_id, year) DO UPDATE SET
-  has_price = EXCLUDED.has_price,
-  imported_at = EXCLUDED.imported_at;
 
 -- ---------------------------------------------------------------------------
 -- Products (fixed UUIDs)

@@ -34,7 +34,8 @@ export class StocksController {
   @Get()
   @ApiOperation({
     summary: 'Список акций за год',
-    description: 'Returns seeded stocks with yearly average prices from Postgres.',
+    description:
+      'Цены из stock_prices (после Import). Seed больше не кладёт фейковые цены — см. import/HOMEWORK.md.',
   })
   @ApiQuery({ name: 'year', required: false, type: Number, example: 2007 })
   @ApiQuery({
@@ -65,12 +66,13 @@ export class StocksController {
 
   /**
    * POST /api/v1/stocks/resolve
-   * Найти акцию по symbol+exchange (упрощённо — только БД).
+   * Найти акцию; если нет — создать + импорт (домашка, HOMEWORK.md сценарий B).
    */
   @Post('resolve')
   @ApiOperation({
     summary: 'Найти / разрешить акцию по тикеру',
-    description: 'Скелет. SQL-поиск в stocks; внешний импорт — позже.',
+    description:
+      'Сейчас только SELECT. TODO: INSERT + StockImportService (TSLA). См. import/HOMEWORK.md.',
   })
   @ApiBody({ type: ResolveStockDto })
   @ApiOkResponse({ type: ResolveStockResponseDto })
@@ -86,7 +88,7 @@ export class StocksController {
   @Post('history')
   @ApiOperation({
     summary: 'История цен нескольких акций',
-    description: 'Скелет. Сначала реализуй GET :id/history, потом переиспользуй.',
+    description: 'Делегирует в getHistory по каждому id (после import — из БД).',
   })
   @ApiBody({ type: StocksBatchHistoryRequestDto })
   @ApiOkResponse({ type: StockHistoryDto, isArray: true })
@@ -100,7 +102,8 @@ export class StocksController {
   @Get(':id/history')
   @ApiOperation({
     summary: 'История цен одной акции',
-    description: 'Скелет. SQL по stock_prices + exchange_rates (как products history).',
+    description:
+      'Читает stock_prices. TODO cache miss → StockImportService (HOMEWORK.md сценарий A/C).',
   })
   @ApiParam({
     name: 'id',
@@ -137,7 +140,7 @@ export class StocksController {
   @Get(':id')
   @ApiOperation({
     summary: 'Одна акция + coverage',
-    description: 'Скелет. SELECT из stocks + MIN/MAX года из stock_data_coverage.',
+    description: 'Работает без цен (coverage=null) — удобно поллить importStatus после resolve.',
   })
   @ApiParam({
     name: 'id',
