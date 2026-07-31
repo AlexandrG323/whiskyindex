@@ -12,9 +12,9 @@ import {
   ResolveStockDto,
   ResolveStockResponseDto,
   StockDetailDto,
-  StockDto,
   StockHistoryDto,
   StocksBatchHistoryRequestDto,
+  StockYearlyPriceDto,
 } from '../dto/common.dto'
 import { StocksService } from './stocks.service'
 
@@ -29,13 +29,12 @@ export class StocksController {
 
   /**
    * GET /api/v1/stocks?year=&currency=&curated_only=
-   * Сейчас отдаёт хардкод — см. TODO в StocksService.getDefaultStocks.
+   * Default stocks list for the comparison UI.
    */
   @Get()
   @ApiOperation({
     summary: 'Список акций за год',
-    description:
-      'TODO: перевести на Postgres (StockYearlyPriceDto). Сейчас временный хардкод StockDto[].',
+    description: 'Returns seeded stocks with yearly average prices from Postgres.',
   })
   @ApiQuery({ name: 'year', required: false, type: Number, example: 2007 })
   @ApiQuery({
@@ -50,12 +49,12 @@ export class StocksController {
     type: Boolean,
     example: true,
   })
-  @ApiOkResponse({ type: StockDto, isArray: true })
+  @ApiOkResponse({ type: StockYearlyPriceDto, isArray: true })
   list(
     @Query('year') year?: string,
     @Query('currency') currency?: 'rub' | 'usd',
     @Query('curated_only') curatedOnly?: string,
-  ): StockDto[] {
+  ): Promise<StockYearlyPriceDto[]> {
     const parsedYear = year ? Number(year) : 2007
     return this.stocksService.getDefaultStocks(
       Number.isFinite(parsedYear) ? parsedYear : 2007,

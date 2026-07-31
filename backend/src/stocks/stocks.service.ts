@@ -1,145 +1,276 @@
-import { Inject, Injectable, NotImplementedException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
 import type {
   ResolveStockDto,
   ResolveStockResponseDto,
   StockDetailDto,
-  StockDto,
   StockHistoryDto,
   StocksBatchHistoryRequestDto,
+  StockYearlyPriceDto,
 } from '../dto/common.dto'
 
 @Injectable()
 export class StocksService {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
-  /**
-   * GET /api/v1/stocks — список акций с ценой за год.
-   *
-   * TODO: убрать хардкод ниже и читать из Postgres (как ProductsService.getCart).
-   *
-   * Подсказки для list из БД:
-   * 1. SELECT из `stocks` JOIN `stock_prices` ON year = $1
-   * 2. Опционально: WHERE is_curated = true, если curatedOnly
-   * 3. Конвертация валюты через `exchange_rates`:
-   *    - цена в БД уже в native_currency (RUB или USD)
-   *    - если display = native → оставь как есть
-   *    - USD→RUB: average_price * rate
-   *    - RUB→USD: average_price / rate
-   * 4. Верни StockYearlyPriceDto[] (см. SPEC.md и common.dto.ts)
-   * 5. Пустой результат → NotFoundException
-   *
-   * Таблицы: stocks, stock_prices, exchange_rates (db/init/01_schema.sql)
-   * Пример id: 11111111-1111-4111-8111-111111111007 (AAPL)
-   */
-  getDefaultStocks(
-    _year = 2007,
-    _currency: 'rub' | 'usd' = 'rub',
-    _curatedOnly = false,
-  ): StockDto[] {
-    // TODO: заменить на async + this.pool.query → StockYearlyPriceDto[]
-    void this.pool
-    void _year
-    void _currency
-    void _curatedOnly
-    return [
-      { ticker: 'GAZP', name: 'Газпром' },
-      { ticker: 'SBER', name: 'Сбербанк' },
-      { ticker: 'LKOH', name: 'Лукойл' },
-      { ticker: 'GMKN', name: 'Норникель' },
-      { ticker: 'ROSN', name: 'Роснефть' },
-      { ticker: 'AVAZ', name: 'АвтоВАЗ' },
-      { ticker: 'AAPL', name: 'Apple' },
-      { ticker: 'GOOGL', name: 'Google' },
-      { ticker: 'MCD', name: "McDonald's" },
-      { ticker: 'SPX', name: 'S&P 500' },
-      { ticker: 'PM', name: 'Philip Morris' },
-    ]
+  async getDefaultStocks(
+    year = 2007,
+    currency: 'rub' | 'usd' = 'rub',
+    curatedOnly = false,
+  ): Promise<StockYearlyPriceDto[]> {
+    const displayCurrency = currency === 'rub' ? 'RUB' : 'USD'
+
+    let sql = `
+      SELECT
+        s.id,
+        s.symbol,
+        s.company_name,
+        s.image_url,
+        s.native_currency,
+        s.import_status,
+        sp.average_price
+      FROM stocks s
+      JOIN stock_prices sp
+        ON sp.stock_id = s.id
+      WHERE
+        sp.year = $1
+        AND s.is_active = true
+    `
+
+    if (curatedOnly) {
+      sql += ` AND s.is_curated = true`
+    }
+
+    const { rows } = await this.pool.query(sql, [year])
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`No stocks found for year ${year}`)
+    }
+
+    let rate: number | null = null
+
+    if (rows.some((row) => row.native_currency !== displayCurrency)) {
+      const exchange = await this.pool.query(
+        `
+        SELECT rate
+        FROM exchange_rates
+        WHERE
+            year = $1
+            AND base_currency = 'USD'
+            AND quote_currency = 'RUB'
+        `,
+        [year],
+      )
+
+      if (exchange.rows.length === 0) {
+        throw new NotFoundException(`Exchange rate for ${year} not found`)
+      }
+
+      rate = Number(exchange.rows[0].rate)
+    }
+
+    return rows.map((row) => {
+      let price = Number(row.average_price)
+
+      if (row.native_currency !== displayCurrency) {
+        if (row.native_currency === 'USD') {
+          price *= rate ?? 1
+        } else {
+          price /= rate ?? 1
+        }
+      }
+
+      return {
+        id: row.id,
+        symbol: row.symbol,
+        companyName: row.company_name,
+        imageUrl: row.image_url,
+        nativeCurrency: row.native_currency,
+        displayCurrency,
+        price,
+        importStatus: row.import_status,
+      }
+    })
   }
 
-  /**
-   * GET /api/v1/stocks/{id} — карточка одной акции + покрытие годов.
-   *
-   * Подсказки (только SQL, без внешних API):
-   * 1. SELECT id, symbol, company_name, image_url, exchange, native_currency, import_status
-   *    FROM stocks WHERE id = $1
-   * 2. coverage.from / coverage.to = MIN(year) / MAX(year) из stock_data_coverage
-   *    (или stock_prices) для этого stock_id
-   * 3. Нет строки → NotFoundException
-   * 4. Верни StockDetailDto
-   *
-   * Попробуй: GET /api/v1/stocks/11111111-1111-4111-8111-111111111007
-   */
-  async getById(_id: string): Promise<StockDetailDto> {
-    void this.pool
-    throw new NotImplementedException(
-      'getById — скелет. SELECT из stocks + MIN/MAX года покрытия (см. комментарий выше)',
+  async getById(id: string): Promise<StockDetailDto> {
+    const { rows } = await this.pool.query(
+      `
+        SELECT
+          s.id,
+          s.symbol,
+          s.company_name,
+          s.image_url,
+          s.exchange,
+          s.native_currency,
+          s.import_status,
+          MIN(sp.year) AS coverage_from,
+          MAX(sp.year) AS coverage_to
+        FROM stocks AS s
+        JOIN stock_prices AS sp
+          ON sp.stock_id = s.id
+        WHERE s.id = $1
+        GROUP BY
+          s.id,
+          s.symbol,
+          s.company_name,
+          s.image_url,
+          s.exchange,
+          s.native_currency,
+          s.import_status
+      `,
+      [id],
     )
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`Stock with id "${id}" not found`)
+    }
+
+    const [row] = rows
+
+    if (row.coverage_from === null || row.coverage_to === null) {
+      throw new NotFoundException(`Stock "${row.symbol}" has no historical price data`)
+    }
+
+    return {
+      id: row.id,
+      symbol: row.symbol,
+      companyName: row.company_name,
+      imageUrl: row.image_url,
+      exchange: row.exchange,
+      nativeCurrency: row.native_currency,
+      importStatus: row.import_status,
+      coverage: {
+        from: Number(row.coverage_from),
+        to: Number(row.coverage_to),
+      },
+    }
   }
 
-  /**
-   * GET /api/v1/stocks/{id}/history — цены по годам для одной акции.
-   *
-   * Подсказки (как ProductsService.getHistory, но у акций есть nativeAmount):
-   * 1. JOIN stocks + stock_prices WHERE stock_id = $1 AND year BETWEEN $2 AND $3
-   * 2. nativeAmount = sp.average_price (как в БД)
-   * 3. amount = конвертация в displayCurrency через exchange_rates
-   *    (та же логика, что в TODO для list)
-   * 4. ORDER BY year ASC
-   * 5. Нет данных → NotFoundException
-   * 6. Верни StockHistoryDto: { id, symbol, imageUrl, nativeCurrency, displayCurrency, importStatus, prices }
-   *
-   * Попробуй:
-   * GET /api/v1/stocks/11111111-1111-4111-8111-111111111007/history?from=2007&to=2010&currency=rub
-   */
   async getHistory(
-    _id: string,
-    _from = 2007,
-    _to = 2026,
-    _currency: 'rub' | 'usd' = 'rub',
+    id: string,
+    from = 2007,
+    to = 2026,
+    currency: 'rub' | 'usd' = 'rub',
   ): Promise<StockHistoryDto> {
-    void this.pool
-    throw new NotImplementedException(
-      'getHistory — скелет. Смотри ProductsService.getHistory и подсказки выше',
+    const displayCurrency = currency === 'rub' ? 'RUB' : 'USD'
+
+    const { rows } = await this.pool.query(
+      `
+        SELECT
+          s.id,
+          s.symbol,
+          s.image_url,
+          s.native_currency,
+          s.import_status,
+          sp.year,
+          sp.average_price
+        FROM stocks AS s
+        JOIN stock_prices AS sp
+          ON sp.stock_id = s.id
+        WHERE
+          s.id = $1
+          AND sp.year BETWEEN $2 AND $3
+        ORDER BY sp.year ASC
+      `,
+      [id, from, to],
     )
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`No history found for stock "${id}" between ${from} and ${to}`)
+    }
+
+    const [firstRow] = rows
+
+    let exchangeRates = new Map<number, number>()
+
+    if (firstRow.native_currency !== displayCurrency) {
+      const { rows: rateRows } = await this.pool.query(
+        `
+          SELECT
+            year,
+            rate
+          FROM exchange_rates
+          WHERE
+            year BETWEEN $1 AND $2
+            AND base_currency = 'USD'
+            AND quote_currency = 'RUB'
+        `,
+        [from, to],
+      )
+
+      exchangeRates = new Map(rateRows.map((row) => [Number(row.year), Number(row.rate)]))
+    }
+
+    return {
+      id: firstRow.id,
+      symbol: firstRow.symbol,
+      imageUrl: firstRow.image_url,
+      nativeCurrency: firstRow.native_currency,
+      displayCurrency,
+      importStatus: firstRow.import_status,
+      prices: rows.map((row) => {
+        const nativeAmount = Number(row.average_price)
+
+        let amount = nativeAmount
+
+        if (row.native_currency !== displayCurrency) {
+          const rate = exchangeRates.get(Number(row.year))
+
+          if (!rate) {
+            throw new NotFoundException(`Exchange rate for ${row.year} not found`)
+          }
+
+          amount = row.native_currency === 'USD' ? nativeAmount * rate : nativeAmount / rate
+        }
+
+        return {
+          year: Number(row.year),
+          nativeAmount,
+          amount,
+        }
+      }),
+    }
   }
 
-  /**
-   * POST /api/v1/stocks/history — история сразу для нескольких акций.
-   *
-   * Подсказки:
-   * 1. body.ids — массив UUID; from, to, currency — как в getHistory
-   * 2. Для MVP (seed): просто вызови логику getHistory для каждого id
-   *    (или один SQL: WHERE stock_id = ANY($1::uuid[]))
-   * 3. Верни StockHistoryDto[] — по одному объекту на акцию
-   * 4. Акции без цен пока можно пропускать или кидать 404 — на твой выбор, опиши в PR
-   *
-   * Позже (не сейчас): для акций без кеша — очередь импорта (SPEC Import Service).
-   */
-  async getBatchHistory(_body: StocksBatchHistoryRequestDto): Promise<StockHistoryDto[]> {
-    void this.pool
-    throw new NotImplementedException(
-      'getBatchHistory — скелет. Сначала сделай getHistory, потом переиспользуй его здесь',
-    )
+  async getBatchHistory(body: StocksBatchHistoryRequestDto): Promise<StockHistoryDto[]> {
+    const { ids, from, to, currency } = body
+
+    return Promise.all(ids.map((id) => this.getHistory(id, from, to, currency)))
   }
 
-  /**
-   * POST /api/v1/stocks/resolve — найти/создать акцию по тикеру.
-   *
-   * ⚠️ Сложнее остальных: по SPEC нужен lazy-import из MOEX/Yahoo.
-   * Для обучения можно сделать упрощённо (только SQL):
-   * 1. Ищи в stocks WHERE symbol = $1 AND exchange = $2
-   * 2. Если нашли → верни { id, symbol, importStatus, imageUrl } со статусом из БД
-   * 3. Если не нашли → пока NotFoundException
-   *    (создание + импорт с внешнего API — отдельная задача позже)
-   *
-   * Полный SPEC: 202 + importStatus=importing, потом клиент поллит GET /stocks/{id}.
-   */
-  async resolve(_body: ResolveStockDto): Promise<ResolveStockResponseDto> {
-    void this.pool
-    throw new NotImplementedException(
-      'resolve — скелет. Начни с SELECT по symbol+exchange; внешний API пока не трогай',
+  async resolve(body: ResolveStockDto): Promise<ResolveStockResponseDto> {
+    const symbol = body.symbol.trim().toUpperCase()
+    const exchange = body.exchange.trim()
+
+    const { rows } = await this.pool.query(
+      `
+        SELECT
+          id,
+          symbol,
+          import_status,
+          image_url
+        FROM stocks
+        WHERE
+          symbol = $1
+          AND exchange = $2
+        LIMIT 1
+      `,
+      [symbol, exchange],
     )
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`Stock "${symbol}" on exchange "${exchange}" not found`)
+    }
+
+    const [row] = rows
+
+    return {
+      id: row.id,
+      symbol: row.symbol,
+      importStatus: row.import_status,
+      imageUrl: row.image_url,
+    }
   }
 }

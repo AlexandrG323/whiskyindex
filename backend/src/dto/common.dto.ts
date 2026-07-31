@@ -63,15 +63,6 @@ export class ProductDto {
   name!: string
 }
 
-/** @deprecated Старый хардкод-формат. Замени на StockYearlyPriceDto при переходе list на БД. */
-export class StockDto {
-  @ApiProperty({ example: 'AAPL' })
-  ticker!: string
-
-  @ApiProperty({ example: 'Apple' })
-  name!: string
-}
-
 /** Элемент списка акций (SPEC → GET /api/v1/stocks) */
 export class StockYearlyPriceDto {
   @ApiProperty({ example: '11111111-1111-4111-8111-111111111007' })
