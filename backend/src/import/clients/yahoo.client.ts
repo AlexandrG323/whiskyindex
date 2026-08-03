@@ -96,6 +96,10 @@ export class YahooClient {
     })
 
     if (!res.ok) {
+      const text = await res.text()
+
+      console.log(res.status)
+      console.log(text)
       throw new Error(`Yahoo API HTTP error ${res.status} for symbol ${symbol}`)
     }
 

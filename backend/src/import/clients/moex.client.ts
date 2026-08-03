@@ -64,9 +64,11 @@ export class MoexClient {
     let hasMore = true
 
     while (hasMore) {
-      const url = `https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities/${encodeURIComponent(
+      const url = `https://iss.moex.com/iss/engines/stock/markets/shares/securities/${encodeURIComponent(
         symbol,
       )}/candles.json?from=${from}&till=${till}&interval=31&start=${start}`
+
+      console.log(url)
 
       const res = await fetch(url)
       if (!res.ok) {

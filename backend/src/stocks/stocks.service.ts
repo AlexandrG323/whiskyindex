@@ -224,7 +224,14 @@ export class StocksService {
     )
 
     // CACHE MISS: Запускаем импорт, если строк в БД пока нет
-    if (rows.length === 0) {
+
+    const existingYears = rows.map((row) => Number(row.year))
+
+    const expectedYearsCount = to - from + 1
+
+    const hasCompleteHistory = existingYears.length === expectedYearsCount
+
+    if (!hasCompleteHistory) {
       // Проверяем, существует ли акция вообще
       await this.getById(id)
 
