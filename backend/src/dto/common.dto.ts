@@ -217,3 +217,11 @@ export class StocksBatchHistoryRequestDto {
   @ApiProperty({ example: 'rub', enum: ['rub', 'usd'] })
   currency!: 'rub' | 'usd'
 }
+
+export class CompareCartAndStocksDto {
+  @ApiProperty({ type: ProductYearlyPriceDto, isArray: true })
+  cart!: ProductYearlyPriceDto[]
+
+  @ApiProperty({ type: StockYearlyPriceDto, isArray: true })
+  stocks!: StockYearlyPriceDto[]
+}
