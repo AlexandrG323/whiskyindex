@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, NotImplementedException } from '@nestjs/common'
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
 import { MoexClient } from './clients/moex.client'
@@ -25,16 +25,11 @@ type StockRow = {
  *
  * ВАЖНО (SPEC): контроллеры НЕ ходят во внешние API сами — только через этот сервис.
  * Пока импорт идёт, StocksService должен отдавать 202 + importStatus=importing.
- *
- * Порядок реализации (домашка):
- * A. MoexClient.fetchMonthlyCandles + YahooClient.fetchMonthlyCandles
- * B. averageByYear() — чистая функция, можно покрыть простым ручным тестом
- * C. persistYearlyPrices() — INSERT в Postgres
- * D. importStockById() — склейка всего + статусы
- * E. Подключить вызов из StocksService (history / resolve) при cache miss
  */
 @Injectable()
 export class StockImportService {
+  private readonly logger = new Logger(StockImportService.name)
+
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     private readonly moex: MoexClient,
@@ -57,16 +52,48 @@ export class StockImportService {
    * Не стартуй второй импорт, если статус уже `importing` (простая защита от гонок).
    */
   async importStockById(
-    _stockId: string,
-    _fromYear = 2007,
-    _toYear = new Date().getFullYear(),
+    stockId: string,
+    fromYear = 2007,
+    toYear = new Date().getFullYear(),
   ): Promise<void> {
-    void this.pool
-    void this.moex
-    void this.yahoo
-    throw new NotImplementedException(
-      'StockImportService.importStockById — склей клиенты + запись в БД (см. HOMEWORK.md)',
+    const stock = await this.getStockOrThrow(stockId)
+
+    if (stock.import_status === 'importing') {
+      this.logger.warn(`Import already in progress for stock ${stockId}`)
+      return
+    }
+
+    await this.pool.query(
+      `UPDATE stocks SET import_status = 'importing', import_error = NULL, updated_at = now() WHERE id = $1`,
+      [stockId],
     )
+
+    try {
+      let candles: MonthlyCandle[] = []
+      if (stock.source === 'moex') {
+        candles = await this.moex.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+      } else {
+        candles = await this.yahoo.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+      }
+
+      const yearlyPrices = this.averageByYear(candles, stock.native_currency)
+
+      await this.persistYearlyPrices(stockId, yearlyPrices)
+
+      await this.pool.query(
+        `UPDATE stocks SET import_status = 'ready', prices_cached_at = now(), updated_at = now() WHERE id = $1`,
+        [stockId],
+      )
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      this.logger.error(`Import failed for stock ${stockId}: ${errorMessage}`)
+
+      await this.pool.query(
+        `UPDATE stocks SET import_status = 'failed', import_error = $2, updated_at = now() WHERE id = $1`,
+        [stockId, errorMessage],
+      )
+      throw err
+    }
   }
 
   /**
@@ -78,8 +105,32 @@ export class StockImportService {
    * Пример:
    *   candles за 2020: 12 месяцев → один YearlyAveragePrice { year: 2020, averagePrice, currency }
    */
-  averageByYear(_candles: MonthlyCandle[], _currency: 'RUB' | 'USD'): YearlyAveragePrice[] {
-    throw new NotImplementedException('averageByYear — чистая агрегация без сети и БД')
+  averageByYear(candles: MonthlyCandle[], currency: 'RUB' | 'USD'): YearlyAveragePrice[] {
+    if (candles.length === 0) return []
+
+    const yearlyMap = new Map<number, number[]>()
+
+    for (const candle of candles) {
+      const year = new Date(candle.date).getUTCFullYear()
+      if (!yearlyMap.has(year)) {
+        yearlyMap.set(year, [])
+      }
+      yearlyMap.get(year)?.push(candle.close)
+    }
+
+    const result: YearlyAveragePrice[] = []
+
+    for (const [year, prices] of yearlyMap.entries()) {
+      const sum = prices.reduce((acc, curr) => acc + curr, 0)
+      const averagePrice = Number((sum / prices.length).toFixed(6))
+      result.push({
+        year,
+        averagePrice,
+        currency,
+      })
+    }
+
+    return result.sort((a, b) => a.year - b.year)
   }
 
   /**
@@ -97,9 +148,45 @@ export class StockImportService {
    *
    * Лучше обернуть в транзакцию: BEGIN … COMMIT (pool.query('BEGIN') …).
    */
-  async persistYearlyPrices(_stockId: string, _yearly: YearlyAveragePrice[]): Promise<void> {
-    void this.pool
-    throw new NotImplementedException('persistYearlyPrices — UPSERT в stock_prices / coverage')
+  async persistYearlyPrices(stockId: string, yearly: YearlyAveragePrice[]): Promise<void> {
+    if (yearly.length === 0) return
+
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      for (const item of yearly) {
+        await client.query(
+          `
+          INSERT INTO stock_prices (stock_id, year, average_price, currency, imported_at)
+          VALUES ($1, $2, $3, $4, now())
+          ON CONFLICT (stock_id, year) DO UPDATE SET
+            average_price = EXCLUDED.average_price,
+            currency = EXCLUDED.currency,
+            imported_at = now()
+          `,
+          [stockId, item.year, item.averagePrice, item.currency],
+        )
+
+        await client.query(
+          `
+          INSERT INTO stock_data_coverage (stock_id, year, has_price, imported_at)
+          VALUES ($1, $2, true, now())
+          ON CONFLICT (stock_id, year) DO UPDATE SET
+            has_price = true,
+            imported_at = now()
+          `,
+          [stockId, item.year],
+        )
+      }
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
   }
 
   /** Утилита: прочитать акцию (пригодится в importStockById). */
