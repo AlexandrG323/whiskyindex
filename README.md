@@ -42,7 +42,7 @@ whiskyindex/
 | Database  | PostgreSQL                                                         |
 | Lint/format | Biome                                                              |
 | Git hooks | Husky + lint-staged                                                |
-| Внешние   | Сторонний API котировок акций                                      |
+| Внешние   | MOEX ISS (RU) + Yahoo Finance (US) — Import Service               |
 
 ## Быстрый старт (Docker)
 
@@ -58,8 +58,9 @@ OpenAPI / Swagger UI: **http://localhost:3000/api/docs** (или через UI: 
 API напрямую: **http://localhost:3000/api**.
 
 На первом старте Postgres применяет схему и демо-сид из `db/init/`
-(акции, продукты, цены 2007–2026, курсы USD/RUB). Если том `pgdata` уже есть —
-пересид: `./db/seed.sh` (или `docker compose down -v && docker compose up --build` для чистого старта).
+(справочник акций без цен, продукты + цены, курсы USD/RUB). Цены акций
+подтягиваются Import Service из MOEX / Yahoo — см. `backend/src/import/HOMEWORK.md`.
+Если том `pgdata` уже есть — пересид: `./db/seed.sh` (или `docker compose down -v && docker compose up --build`).
 
 ## Локальная разработка (npm + только Postgres в Docker)
 
@@ -114,5 +115,5 @@ npm run check       # lint + typecheck (то же, что pre-push)
 
 ## Статус
 
-Скелет проекта. Бизнес-логика (расчёт корзины, интеграция с API котировок, схема БД) —
-в разработке.
+Продукты и SQL-эндпоинты stocks готовы. Цены акций: seed только метаданные;
+интеграция MOEX/Yahoo — домашка в `backend/src/import/HOMEWORK.md`.

@@ -127,8 +127,9 @@ export class StockDetailDto {
   })
   importStatus!: 'pending' | 'importing' | 'ready' | 'failed'
 
-  @ApiProperty({ type: StockCoverageDto })
-  coverage!: StockCoverageDto
+  /** null пока цены ещё не импортированы (import_status = pending/importing) */
+  @ApiPropertyOptional({ type: StockCoverageDto, nullable: true })
+  coverage!: StockCoverageDto | null
 }
 
 export class ResolveStockDto {
