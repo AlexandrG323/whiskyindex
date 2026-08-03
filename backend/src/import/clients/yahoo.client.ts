@@ -1,5 +1,25 @@
-import { Injectable, NotImplementedException } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import type { MonthlyCandle } from '../types'
+
+type YahooChartResponse = {
+  chart?: {
+    result?: Array<{
+      timestamp?: number[]
+      indicators?: {
+        quote?: Array<{
+          open?: (number | null)[]
+          high?: (number | null)[]
+          low?: (number | null)[]
+          close?: (number | null)[]
+        }>
+      }
+    }>
+    error?: {
+      code: string
+      description: string
+    }
+  }
+}
 
 /**
  * Клиент Yahoo Finance (US: AAPL, TSLA, …).
@@ -44,8 +64,10 @@ import type { MonthlyCandle } from '../types'
  */
 @Injectable()
 export class YahooClient {
+  private readonly logger = new Logger(YahooClient.name)
+
   /**
-   * TODO: скачать месячные свечи для Yahoo-символа за [fromYear, toYear].
+   * Скачать месячные свечи для Yahoo-символа за [fromYear, toYear].
    *
    * Шаги:
    * 1. Замапь внутренний symbol → Yahoo ticker (SPX → ^GSPC)
@@ -54,12 +76,59 @@ export class YahooClient {
    * 4. Склей timestamp + quote → MonthlyCandle[]
    */
   async fetchMonthlyCandles(
-    _symbol: string,
-    _fromYear: number,
-    _toYear: number,
+    symbol: string,
+    fromYear: number,
+    toYear: number,
   ): Promise<MonthlyCandle[]> {
-    throw new NotImplementedException(
-      'YahooClient.fetchMonthlyCandles — реализуй fetch к query1.finance.yahoo.com (см. yahoo.client.ts)',
-    )
+    const yahooSymbol = symbol === 'SPX' ? '^GSPC' : symbol
+
+    const period1 = Math.floor(Date.UTC(fromYear, 0, 1) / 1000)
+    const period2 = Math.floor(Date.UTC(toYear, 11, 31) / 1000)
+
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      yahooSymbol,
+    )}?period1=${period1}&period2=${period2}&interval=1mo`
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WhiskyIndex/0.1; +local-dev)',
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`Yahoo API HTTP error ${res.status} for symbol ${symbol}`)
+    }
+
+    const json = (await res.json()) as YahooChartResponse
+    const result = json.chart?.result?.[0]
+
+    if (!result?.timestamp || !result.indicators?.quote?.[0]) {
+      return []
+    }
+
+    const timestamps = result.timestamp
+    const quote = result.indicators.quote[0]
+    const candles: MonthlyCandle[] = []
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const close = quote.close?.[i]
+      if (close === null || close === undefined) continue
+
+      const open = quote.open?.[i] ?? close
+      const high = quote.high?.[i] ?? close
+      const low = quote.low?.[i] ?? close
+      const dateStr = new Date(timestamps[i] * 1000).toISOString().substring(0, 10)
+
+      candles.push({
+        date: dateStr,
+        open: Number(open),
+        high: Number(high),
+        low: Number(low),
+        close: Number(close),
+      })
+    }
+
+    this.logger.log(`Fetched ${candles.length} monthly candles from Yahoo for ${symbol}`)
+    return candles
   }
 }

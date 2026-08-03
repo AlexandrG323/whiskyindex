@@ -30,85 +30,112 @@ export class StocksService {
   async getDefaultStocks(
     year = 2007,
     currency: 'rub' | 'usd' = 'rub',
-    curatedOnly = false,
+    curatedOnly = true,
   ): Promise<StockYearlyPriceDto[]> {
-    // TODO(homework): если rows пустые для curated — запусти import для нужных id
-    // (или документируй, что сначала нужен import через history/resolve).
-    void this.stockImport
-
     const displayCurrency = currency === 'rub' ? 'RUB' : 'USD'
 
-    let sql = `
+    const whereClause = curatedOnly ? 'WHERE s.is_curated = true' : ''
+
+    const { rows: stocks } = await this.pool.query(
+      `
       SELECT
         s.id,
         s.symbol,
         s.company_name,
-        s.image_url,
+        s.country,
+        s.exchange,
+        s.source,
         s.native_currency,
         s.import_status,
+        s.image_url,
         sp.average_price
-      FROM stocks s
-      JOIN stock_prices sp
-        ON sp.stock_id = s.id
-      WHERE
-        sp.year = $1
-        AND s.is_active = true
-    `
+      FROM stocks AS s
+      LEFT JOIN stock_prices AS sp
+        ON sp.stock_id = s.id AND sp.year = $1
+      ${whereClause}
+      ORDER BY s.symbol ASC
+      `,
+      [year],
+    )
 
-    if (curatedOnly) {
-      sql += ` AND s.is_curated = true`
+    if (stocks.length === 0) {
+      return []
     }
 
-    const { rows } = await this.pool.query(sql, [year])
+    // Проверяем, есть ли акции без загруженной цены за этот год
+    const missingPriceStocks = stocks.filter((s) => s.average_price === null)
 
-    if (rows.length === 0) {
-      throw new NotFoundException(
-        `No stocks found for year ${year}. Seed больше не кладёт цены — нужен Import Service (HOMEWORK.md).`,
-      )
-    }
+    // Если есть акции без цены — запускаем импорт для каждой
+    if (missingPriceStocks.length > 0) {
+      for (const stock of missingPriceStocks) {
+        try {
+          await this.stockImport.importStockById(stock.id, year, year)
+        } catch {
+          // Игнорируем ошибки отдельного импорта, чтобы отдавать то, что загрузилось
+        }
+      }
 
-    let rate: number | null = null
-
-    if (rows.some((row) => row.native_currency !== displayCurrency)) {
-      const exchange = await this.pool.query(
+      // Перезапрашиваем данные из БД после импорта
+      const retryResult = await this.pool.query(
         `
-        SELECT rate
-        FROM exchange_rates
-        WHERE
-            year = $1
-            AND base_currency = 'USD'
-            AND quote_currency = 'RUB'
+        SELECT
+          s.id,
+          s.symbol,
+          s.company_name,
+          s.country,
+          s.exchange,
+          s.source,
+          s.native_currency,
+          s.import_status,
+          s.image_url,
+          sp.average_price
+        FROM stocks AS s
+        LEFT JOIN stock_prices AS sp
+          ON sp.stock_id = s.id AND sp.year = $1
+        ${whereClause}
+        ORDER BY s.symbol ASC
         `,
         [year],
       )
 
-      if (exchange.rows.length === 0) {
-        throw new NotFoundException(`Exchange rate for ${year} not found`)
-      }
-
-      rate = Number(exchange.rows[0].rate)
+      stocks.splice(0, stocks.length, ...retryResult.rows)
     }
 
-    return rows.map((row) => {
-      let price = Number(row.average_price)
+    // Достаем курсы валют
+    const { rows: rateRows } = await this.pool.query(
+      `
+      SELECT year, rate
+      FROM exchange_rates
+      WHERE year = $1
+        AND base_currency = 'USD'
+        AND quote_currency = 'RUB'
+      `,
+      [year],
+    )
 
-      if (row.native_currency !== displayCurrency) {
-        if (row.native_currency === 'USD') {
-          price *= rate ?? 1
-        } else {
-          price /= rate ?? 1
-        }
+    const fxRate = rateRows.length > 0 ? Number(rateRows[0].rate) : 1
+
+    return stocks.map((row) => {
+      const nativeAmount = row.average_price !== null ? Number(row.average_price) : null
+      let amount = nativeAmount
+
+      if (nativeAmount !== null && row.native_currency !== displayCurrency) {
+        amount = row.native_currency === 'USD' ? nativeAmount * fxRate : nativeAmount / fxRate
       }
 
       return {
         id: row.id,
         symbol: row.symbol,
         companyName: row.company_name,
-        imageUrl: row.image_url,
+        country: row.country,
+        exchange: row.exchange,
+        source: row.source,
         nativeCurrency: row.native_currency,
         displayCurrency,
-        price,
+
         importStatus: row.import_status,
+        imageUrl: row.image_url,
+        price: amount !== null ? Number(amount.toFixed(2)) : 0,
       }
     })
   }
@@ -173,14 +200,9 @@ export class StocksService {
     to = 2026,
     currency: 'rub' | 'usd' = 'rub',
   ): Promise<StockHistoryDto> {
-    // TODO(homework): если rows.length === 0 →
-    //   await this.stockImport.importStockById(id, from, to)
-    //   и либо повтори SELECT, либо верни 202 Accepted + importing
-    void this.stockImport
-
     const displayCurrency = currency === 'rub' ? 'RUB' : 'USD'
 
-    const { rows } = await this.pool.query(
+    let { rows } = await this.pool.query(
       `
         SELECT
           s.id,
@@ -201,10 +223,41 @@ export class StocksService {
       [id, from, to],
     )
 
+    // CACHE MISS: Запускаем импорт, если строк в БД пока нет
     if (rows.length === 0) {
-      throw new NotFoundException(
-        `No history for stock "${id}" between ${from}-${to}. Нужен Import (HOMEWORK.md) или цены ещё не загружены.`,
+      // Проверяем, существует ли акция вообще
+      await this.getById(id)
+
+      // Импортируем синхронно
+      await this.stockImport.importStockById(id, from, to)
+
+      // Повторяем выборку после успешного импорта
+      const retryResult = await this.pool.query(
+        `
+          SELECT
+            s.id,
+            s.symbol,
+            s.image_url,
+            s.native_currency,
+            s.import_status,
+            sp.year,
+            sp.average_price
+          FROM stocks AS s
+          JOIN stock_prices AS sp
+            ON sp.stock_id = s.id
+          WHERE
+            s.id = $1
+            AND sp.year BETWEEN $2 AND $3
+          ORDER BY sp.year ASC
+        `,
+        [id, from, to],
       )
+
+      rows = retryResult.rows
+    }
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`No history for stock "${id}" between ${from}-${to}.`)
     }
 
     const [firstRow] = rows
@@ -214,12 +267,9 @@ export class StocksService {
     if (firstRow.native_currency !== displayCurrency) {
       const { rows: rateRows } = await this.pool.query(
         `
-          SELECT
-            year,
-            rate
+          SELECT year, rate
           FROM exchange_rates
-          WHERE
-            year BETWEEN $1 AND $2
+          WHERE year BETWEEN $1 AND $2
             AND base_currency = 'USD'
             AND quote_currency = 'RUB'
         `,
@@ -267,36 +317,45 @@ export class StocksService {
   }
 
   async resolve(body: ResolveStockDto): Promise<ResolveStockResponseDto> {
-    // TODO(homework):
-    // 1. Если строки нет — INSERT (source: exchange===MOEX ? 'moex' : 'yahoo',
-    //    native_currency: moex→RUB, yahoo→USD, import_status='pending')
-    // 2. Запусти this.stockImport.importStockById(id) (не await в фоне ИЛИ await для MVP)
-    // 3. Верни importStatus (importing / ready). Для 202 — HttpCode / Exception.
-    void this.stockImport
-
     const symbol = body.symbol.trim().toUpperCase()
-    const exchange = body.exchange.trim()
+    const exchange = body.exchange.trim().toUpperCase()
 
-    const { rows } = await this.pool.query(
+    let { rows } = await this.pool.query(
       `
-        SELECT
-          id,
-          symbol,
-          import_status,
-          image_url
+        SELECT id, symbol, import_status, image_url
         FROM stocks
-        WHERE
-          symbol = $1
-          AND exchange = $2
+        WHERE symbol = $1 AND exchange = $2
         LIMIT 1
       `,
       [symbol, exchange],
     )
 
+    // Если акции нет в базе — создаем запись и запускаем импорт
     if (rows.length === 0) {
-      throw new NotFoundException(
-        `Stock "${symbol}" on "${exchange}" not found. TODO: создать запись + Import (HOMEWORK.md сценарий B — TSLA).`,
+      const source = exchange === 'MOEX' || exchange === 'TQBR' ? 'moex' : 'yahoo'
+      const nativeCurrency = source === 'moex' ? 'RUB' : 'USD'
+
+      const insertResult = await this.pool.query(
+        `
+        INSERT INTO stocks (symbol, company_name, country, exchange, source, native_currency, import_status)
+        VALUES ($1, $1, $2, $3, $4, $5, 'pending')
+        RETURNING id, symbol, import_status, image_url
+        `,
+        [symbol, source === 'moex' ? 'Russia' : 'USA', exchange, source, nativeCurrency],
       )
+
+      rows = insertResult.rows
+      const newStock = rows[0]
+
+      // Запускаем импорт для новой акции
+      await this.stockImport.importStockById(newStock.id)
+
+      // Запрашиваем обновленный статус
+      const updated = await this.pool.query(
+        `SELECT id, symbol, import_status, image_url FROM stocks WHERE id = $1`,
+        [newStock.id],
+      )
+      rows = updated.rows
     }
 
     const [row] = rows

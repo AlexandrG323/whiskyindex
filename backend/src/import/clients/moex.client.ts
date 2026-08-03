@@ -1,5 +1,12 @@
-import { Injectable, NotImplementedException } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import type { MonthlyCandle } from '../types'
+
+type MoexCandlesResponse = {
+  candles?: {
+    columns: string[]
+    data: (number | string)[]
+  }
+}
 
 /**
  * Клиент MOEX ISS (российские акции: GAZP, SBER, …).
@@ -30,8 +37,10 @@ import type { MonthlyCandle } from '../types'
  */
 @Injectable()
 export class MoexClient {
+  private readonly logger = new Logger(MoexClient.name)
+
   /**
-   * TODO: скачать месячные свечи для `symbol` за период [fromYear, toYear].
+   * Скачать месячные свечи для `symbol` за период [fromYear, toYear].
    *
    * Шаги:
    * 1. Собери URL (см. комментарий класса)
@@ -43,12 +52,59 @@ export class MoexClient {
    *   curl -s "https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities/SBER/candles.json?from=2020-01-01&till=2020-12-31&interval=31" | head
    */
   async fetchMonthlyCandles(
-    _symbol: string,
-    _fromYear: number,
-    _toYear: number,
+    symbol: string,
+    fromYear: number,
+    toYear: number,
   ): Promise<MonthlyCandle[]> {
-    throw new NotImplementedException(
-      'MoexClient.fetchMonthlyCandles — реализуй fetch к iss.moex.com (см. комментарии в moex.client.ts)',
-    )
+    const from = `${fromYear}-01-01`
+    const till = `${toYear}-12-31`
+    const candles: MonthlyCandle[] = []
+
+    let start = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const url = `https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities/${encodeURIComponent(
+        symbol,
+      )}/candles.json?from=${from}&till=${till}&interval=31&start=${start}`
+
+      const res = await fetch(url)
+      if (!res.ok) {
+        throw new Error(`MOEX API HTTP error ${res.status} for symbol ${symbol}`)
+      }
+
+      const json = (await res.json()) as MoexCandlesResponse
+
+      if (!json.candles?.data || json.candles.data.length === 0) {
+        hasMore = false
+        break
+      }
+
+      const { columns, data } = json.candles
+      const openIdx = columns.indexOf('open')
+      const highIdx = columns.indexOf('high')
+      const lowIdx = columns.indexOf('low')
+      const closeIdx = columns.indexOf('close')
+      const beginIdx = columns.indexOf('begin')
+
+      for (const row of data) {
+        const beginDate = String(row[beginIdx]).substring(0, 10)
+        candles.push({
+          date: beginDate,
+          open: Number(row[openIdx]),
+          high: Number(row[highIdx]),
+          low: Number(row[lowIdx]),
+          close: Number(row[closeIdx]),
+        })
+      }
+
+      start += data.length
+      if (data.length < 500) {
+        hasMore = false
+      }
+    }
+
+    this.logger.log(`Fetched ${candles.length} monthly candles from MOEX for ${symbol}`)
+    return candles
   }
 }
