@@ -1,7 +1,7 @@
-import { Controller, Get, NotImplementedException, Query } from '@nestjs/common'
-import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
-//import { AnalyticsService } from './analytics.service'
-import { CompareCartAndStocksDto } from '../dto/common.dto'
+import { Controller, Get, Param, Query } from '@nestjs/common'
+import { ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { CompareCartAndStocksDto, CompareCartToStockByIdDto } from '../dto/common.dto'
+import { AnalyticsService } from './analytics.service'
 
 /**
  * Analytics API surface (SPEC.md → GET /api/v1/analytics/...).
@@ -10,7 +10,7 @@ import { CompareCartAndStocksDto } from '../dto/common.dto'
 @ApiTags('analytics')
 @Controller('v1/analytics')
 export class AnalyticsController {
-  //constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('compare')
   @ApiOperation({ summary: 'Compare cart and stocks' })
@@ -34,6 +34,42 @@ export class AnalyticsController {
     console.log('to', to)
     console.log('currency', currency)
     console.log('stockIds', stockIds)
-    throw new NotImplementedException('Not implemented yet')
+    const parsedFromYear = from ? Number(from) : 2007
+    const parsedToYear = to ? Number(to) : 2026
+    return this.analyticsService.compareCartAndStocks(
+      parsedFromYear,
+      parsedToYear,
+      currency === 'usd' ? 'usd' : 'rub',
+      stockIds ?? [],
+    )
+  }
+
+  @Get('compare/:id')
+  @ApiOperation({ summary: 'Compare cart with one stock by id' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    example: '11111111-1111-4111-8111-111111111006',
+  })
+  @ApiOkResponse({ type: CompareCartToStockByIdDto })
+  compareCartToStockById(
+    @Param('id') id: string,
+    @Query('currency') currency?: 'rub' | 'usd',
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ): Promise<CompareCartToStockByIdDto> {
+    console.log('id', id)
+    console.log('currency', currency)
+    console.log('from', from)
+    console.log('to', to)
+    const parsedFromYear = from ? Number(from) : 2007
+    const parsedToYear = to ? Number(to) : 2026
+    return this.analyticsService.compareCartToStockById(
+      id,
+      currency === 'usd' ? 'usd' : 'rub',
+      parsedFromYear,
+      parsedToYear,
+    )
   }
 }

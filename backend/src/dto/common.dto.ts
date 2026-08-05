@@ -225,3 +225,48 @@ export class CompareCartAndStocksDto {
   @ApiProperty({ type: StockYearlyPriceDto, isArray: true })
   stocks!: StockYearlyPriceDto[]
 }
+
+export class CompareCartToStockByIdDto {
+  @ApiProperty({
+    example: 2450.3,
+    description: 'Рост стоимости акции за выбранный период в процентах',
+  })
+  stockGrowthPercent!: number
+
+  @ApiProperty({
+    example: 1875.4,
+    description: 'Рост стоимости потребительской корзины за выбранный период в процентах',
+  })
+  cartGrowthPercent!: number
+
+  @ApiProperty({
+    example: 574.9,
+    description: 'Разница между ростом акции и ростом корзины в процентах',
+  })
+  differencePercent!: number
+
+  @ApiProperty({
+    example: 12500,
+    description: 'Стоимость одной акции на конец выбранного периода',
+  })
+  stockPrice!: number
+
+  @ApiProperty({
+    example: 6843.5,
+    description: 'Стоимость потребительской корзины на конец выбранного периода',
+  })
+  cartPrice!: number
+
+  @ApiProperty({
+    example: 2399,
+    description: 'Стоимость одной бутылки Jameson 0.7 на конец выбранного периода',
+  })
+  jamesonPrice!: number
+
+  @ApiProperty({
+    example: 'RUB',
+    enum: ['RUB', 'USD'],
+    description: 'Валюта всех денежных значений в ответе',
+  })
+  currency!: 'RUB' | 'USD'
+}
