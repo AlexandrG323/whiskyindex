@@ -20,6 +20,7 @@ export class AnalyticsController {
     required: false,
     type: [String],
     example: ['11111111-1111-4111-8111-111111111006', '11111111-1111-4111-8111-111111111007'],
+    description: 'Repeat ?stockIds= or comma-separated UUIDs; omit for curated stocks',
   })
   @ApiOkResponse({ type: CompareCartAndStocksDto })
   compareCartAndStocks(
@@ -30,12 +31,11 @@ export class AnalyticsController {
   ): Promise<CompareCartAndStocksDto> {
     const parsedFromYear = from ? Number(from) : 2007
     const parsedToYear = to ? Number(to) : 2026
-    const ids = stockIds === undefined ? [] : Array.isArray(stockIds) ? stockIds : [stockIds]
     return this.analyticsService.compareCartAndStocks(
       parsedFromYear,
       parsedToYear,
       currency === 'usd' ? 'usd' : 'rub',
-      ids,
+      this.parseStockIds(stockIds),
     )
   }
 
@@ -65,5 +65,17 @@ export class AnalyticsController {
       parsedFromYear,
       parsedToYear,
     )
+  }
+
+  /** Accept `?stockIds=a,b` or repeated `?stockIds=a&stockIds=b`; empty → curated defaults. */
+  private parseStockIds(stockIds?: string | string[]): string[] {
+    if (stockIds === undefined) {
+      return []
+    }
+    const raw = Array.isArray(stockIds) ? stockIds : [stockIds]
+    return raw
+      .flatMap((value) => value.split(','))
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0)
   }
 }

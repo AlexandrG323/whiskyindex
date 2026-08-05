@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException, RequestTimeoutException } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { PG_POOL } from '../database/database.constants'
 import type {
@@ -297,27 +297,33 @@ export class StocksService {
     return rows
   }
 
-  /** Import range; if another request is already importing, wait until ready/failed. */
+  /** Import range; if another request is already importing, wait then retry if still incomplete. */
   private async ensureImported(id: string, from: number, to: number): Promise<void> {
-    const { rows } = await this.pool.query<{ import_status: string }>(
+    const expectedYears = to - from + 1
+
+    const { rows: statusRows } = await this.pool.query<{ import_status: string }>(
       `SELECT import_status FROM stocks WHERE id = $1`,
       [id],
     )
-    const status = rows[0]?.import_status
+    const status = statusRows[0]?.import_status
 
     if (status === 'importing') {
       await this.waitUntilImportSettled(id)
+    }
+
+    const cached = await this.queryYearlyNativePrices(id, from, to)
+    if (cached.length === expectedYears) {
       return
     }
 
     await this.stockImport.importStockById(id, from, to)
 
     // importStockById returns early if a race flipped status to importing
-    const after = await this.pool.query<{ import_status: string }>(
+    const { rows: afterRows } = await this.pool.query<{ import_status: string }>(
       `SELECT import_status FROM stocks WHERE id = $1`,
       [id],
     )
-    if (after.rows[0]?.import_status === 'importing') {
+    if (afterRows[0]?.import_status === 'importing') {
       await this.waitUntilImportSettled(id)
     }
   }
@@ -335,6 +341,7 @@ export class StocksService {
       }
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
+    throw new RequestTimeoutException(`Timed out waiting for stock "${id}" import to finish`)
   }
 
   private async toDisplayAmount(
