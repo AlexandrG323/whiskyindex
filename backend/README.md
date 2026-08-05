@@ -24,6 +24,8 @@ API: `http://localhost:3000/api` · Swagger: `http://localhost:3000/api/docs`.
 | GET | `/api/v1/stocks/:id/history` | История цен |
 | POST | `/api/v1/stocks/resolve` | Найти/создать тикер + импорт |
 | POST | `/api/v1/stocks/history` | История нескольких акций |
+| GET | `/api/v1/analytics/compare` | Корзина vs акции: рост и purchasing power |
+| GET | `/api/v1/analytics/compare/:id` | Одна акция vs корзина / Jameson |
 
 ## Import (домашка)
 
@@ -35,6 +37,6 @@ Seed кладёт только справочник curated-акций (`import_
 
 ## Дальше по плану
 
-- [ ] Реализовать Import Service (MOEX + Yahoo) — см. HOMEWORK.md
-- [ ] Эндпоинт сравнения корзины vs портфель за диапазон лет
-- [ ] Пересчёт динамики (%)
+- [x] Реализовать Import Service (MOEX + Yahoo) — см. HOMEWORK.md
+- [x] Эндпоинт сравнения корзины vs портфель за диапазон лет
+- [x] Пересчёт динамики (%) + purchasing power (бутылки / акции на корзину)

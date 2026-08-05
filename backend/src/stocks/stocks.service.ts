@@ -194,6 +194,176 @@ export class StocksService {
     }
   }
 
+  /**
+   * Prices at the ends of [from, to] for analytics.
+   *
+   * - Full cache (every year present) → read-only, no external fetch
+   * - Gaps / missing endpoints → StockImportService fills the range, then re-read
+   * - If exact from/to still missing after import (IPO later, delisting, etc.)
+   *   → nearest available years inside the range
+   */
+  async getEndpointPrices(
+    id: string,
+    from = 2007,
+    to = 2026,
+    currency: 'rub' | 'usd' = 'rub',
+  ): Promise<{
+    id: string
+    symbol: string
+    companyName: string
+    imageUrl: string | null
+    fromYear: number
+    toYear: number
+    priceFrom: number
+    priceTo: number
+    importStatus: 'pending' | 'importing' | 'ready' | 'failed'
+  }> {
+    const displayCurrency = currency === 'rub' ? 'RUB' : 'USD'
+    const detail = await this.getById(id)
+
+    let rows = await this.queryYearlyNativePrices(id, from, to)
+    const expectedYears = to - from + 1
+    const hasCompleteHistory = rows.length === expectedYears
+
+    if (!hasCompleteHistory) {
+      await this.ensureImported(id, from, to)
+      rows = await this.queryYearlyNativePrices(id, from, to)
+    }
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`No history for stock "${id}" between ${from}-${to}.`)
+    }
+
+    const sorted = rows
+      .map((row) => ({ year: Number(row.year), nativeAmount: Number(row.average_price) }))
+      .sort((a, b) => a.year - b.year)
+
+    const fromPoint = sorted.find((p) => p.year === from) ?? sorted[0]
+    const toCandidates = sorted.filter((p) => p.year >= fromPoint.year)
+    const toPoint = toCandidates.find((p) => p.year === to) ?? toCandidates[toCandidates.length - 1]
+
+    if (!fromPoint || !toPoint || fromPoint.year >= toPoint.year) {
+      throw new NotFoundException(
+        `Stock "${id}" needs at least two distinct years with prices in ${from}-${to}`,
+      )
+    }
+
+    const nativeCurrency = rows[0].native_currency as 'RUB' | 'USD'
+    const priceFrom = await this.toDisplayAmount(
+      fromPoint.nativeAmount,
+      nativeCurrency,
+      displayCurrency,
+      fromPoint.year,
+    )
+    const priceTo = await this.toDisplayAmount(
+      toPoint.nativeAmount,
+      nativeCurrency,
+      displayCurrency,
+      toPoint.year,
+    )
+
+    const statusRow = await this.pool.query<{
+      import_status: 'pending' | 'importing' | 'ready' | 'failed'
+    }>(`SELECT import_status FROM stocks WHERE id = $1`, [id])
+
+    return {
+      id: detail.id,
+      symbol: detail.symbol,
+      companyName: detail.companyName,
+      imageUrl: detail.imageUrl,
+      fromYear: fromPoint.year,
+      toYear: toPoint.year,
+      priceFrom,
+      priceTo,
+      importStatus: statusRow.rows[0]?.import_status ?? detail.importStatus,
+    }
+  }
+
+  private async queryYearlyNativePrices(id: string, from: number, to: number) {
+    const { rows } = await this.pool.query<{
+      year: number
+      average_price: string
+      native_currency: string
+    }>(
+      `
+        SELECT sp.year, sp.average_price, s.native_currency
+        FROM stocks AS s
+        JOIN stock_prices AS sp ON sp.stock_id = s.id
+        WHERE s.id = $1 AND sp.year BETWEEN $2 AND $3
+        ORDER BY sp.year ASC
+      `,
+      [id, from, to],
+    )
+    return rows
+  }
+
+  /** Import range; if another request is already importing, wait until ready/failed. */
+  private async ensureImported(id: string, from: number, to: number): Promise<void> {
+    const { rows } = await this.pool.query<{ import_status: string }>(
+      `SELECT import_status FROM stocks WHERE id = $1`,
+      [id],
+    )
+    const status = rows[0]?.import_status
+
+    if (status === 'importing') {
+      await this.waitUntilImportSettled(id)
+      return
+    }
+
+    await this.stockImport.importStockById(id, from, to)
+
+    // importStockById returns early if a race flipped status to importing
+    const after = await this.pool.query<{ import_status: string }>(
+      `SELECT import_status FROM stocks WHERE id = $1`,
+      [id],
+    )
+    if (after.rows[0]?.import_status === 'importing') {
+      await this.waitUntilImportSettled(id)
+    }
+  }
+
+  private async waitUntilImportSettled(id: string, timeoutMs = 60_000): Promise<void> {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+      const { rows } = await this.pool.query<{ import_status: string }>(
+        `SELECT import_status FROM stocks WHERE id = $1`,
+        [id],
+      )
+      const status = rows[0]?.import_status
+      if (status === 'ready' || status === 'failed') {
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+  }
+
+  private async toDisplayAmount(
+    nativeAmount: number,
+    nativeCurrency: 'RUB' | 'USD',
+    displayCurrency: 'RUB' | 'USD',
+    year: number,
+  ): Promise<number> {
+    if (nativeCurrency === displayCurrency) {
+      return nativeAmount
+    }
+
+    const { rows } = await this.pool.query<{ rate: string }>(
+      `
+        SELECT rate
+        FROM exchange_rates
+        WHERE year = $1
+          AND base_currency = 'USD'
+          AND quote_currency = 'RUB'
+      `,
+      [year],
+    )
+    if (rows.length === 0) {
+      throw new NotFoundException(`Exchange rate for ${year} not found`)
+    }
+    const rate = Number(rows[0].rate)
+    return nativeCurrency === 'USD' ? nativeAmount * rate : nativeAmount / rate
+  }
+
   async getHistory(
     id: string,
     from = 2007,

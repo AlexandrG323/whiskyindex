@@ -218,50 +218,127 @@ export class StocksBatchHistoryRequestDto {
   currency!: 'rub' | 'usd'
 }
 
-export class CompareCartAndStocksDto {
-  @ApiProperty({ type: ProductYearlyPriceDto, isArray: true })
-  cart!: ProductYearlyPriceDto[]
+/** Purchasing-power snapshot at one end of the period */
+export class PurchasingPowerDto {
+  @ApiProperty({
+    example: 4.2,
+    description: 'How many Jameson bottles one share buys (stockPrice / jamesonPrice)',
+  })
+  whiskyBottlesPerShare!: number
 
-  @ApiProperty({ type: StockYearlyPriceDto, isArray: true })
-  stocks!: StockYearlyPriceDto[]
+  @ApiProperty({
+    example: 2.1,
+    description: 'How many shares one full cart costs (cartPrice / stockPrice)',
+  })
+  sharesPerCart!: number
 }
 
+/** Price range + growth for cart total */
+export class CartPriceRangeDto {
+  @ApiProperty({ example: 3200.5, description: 'Cart total at from year' })
+  priceFrom!: number
+
+  @ApiProperty({ example: 9800.0, description: 'Cart total at to year' })
+  priceTo!: number
+
+  @ApiProperty({
+    example: 206.1,
+    description: '((priceTo - priceFrom) / priceFrom) * 100',
+  })
+  growthPercent!: number
+}
+
+/** Price range + growth for Jameson (or named product) */
+export class ProductPriceRangeDto {
+  @ApiProperty({ example: '22222222-2222-4222-8222-222222222001' })
+  id!: string
+
+  @ApiProperty({ example: 'Виски Jameson 0.7' })
+  name!: string
+
+  @ApiProperty({ example: 650 })
+  priceFrom!: number
+
+  @ApiProperty({ example: 2399 })
+  priceTo!: number
+
+  @ApiProperty({ example: 269.08 })
+  growthPercent!: number
+}
+
+/** Price range + growth for one stock */
+export class StockPriceRangeDto {
+  @ApiProperty({ example: '11111111-1111-4111-8111-111111111001' })
+  id!: string
+
+  @ApiProperty({ example: 'GAZP' })
+  symbol!: string
+
+  @ApiProperty({ example: 'Газпром' })
+  companyName!: string
+
+  @ApiPropertyOptional({ example: null, nullable: true, type: String })
+  imageUrl!: string | null
+
+  @ApiProperty({
+    example: 2007,
+    description: 'Year used for priceFrom (requested from, or nearest available after import)',
+  })
+  priceFromYear!: number
+
+  @ApiProperty({
+    example: 2026,
+    description: 'Year used for priceTo (requested to, or nearest available after import)',
+  })
+  priceToYear!: number
+
+  @ApiProperty({ example: 280.5 })
+  priceFrom!: number
+
+  @ApiProperty({ example: 155.2 })
+  priceTo!: number
+
+  @ApiProperty({ example: -44.67 })
+  growthPercent!: number
+}
+
+/** Stock with purchasing-power ratios (overview list item) */
+export class StockCompareItemDto extends StockPriceRangeDto {
+  @ApiProperty({ type: PurchasingPowerDto })
+  atFrom!: PurchasingPowerDto
+
+  @ApiProperty({ type: PurchasingPowerDto })
+  atTo!: PurchasingPowerDto
+}
+
+/** Multi-stock overview: GET /v1/analytics/compare */
+export class CompareCartAndStocksDto {
+  @ApiProperty({ example: 2007 })
+  from!: number
+
+  @ApiProperty({ example: 2026 })
+  to!: number
+
+  @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
+  currency!: 'RUB' | 'USD'
+
+  @ApiProperty({ type: CartPriceRangeDto })
+  cart!: CartPriceRangeDto
+
+  @ApiProperty({ type: ProductPriceRangeDto })
+  jameson!: ProductPriceRangeDto
+
+  @ApiProperty({ type: StockCompareItemDto, isArray: true })
+  stocks!: StockCompareItemDto[]
+}
+
+/** One stock deep-dive: GET /v1/analytics/compare/:id */
 export class CompareCartToStockByIdDto {
-  @ApiProperty({
-    example: 2450.3,
-    description: 'Рост стоимости акции за выбранный период в процентах',
-  })
-  stockGrowthPercent!: number
+  @ApiProperty({ example: 2007 })
+  from!: number
 
-  @ApiProperty({
-    example: 1875.4,
-    description: 'Рост стоимости потребительской корзины за выбранный период в процентах',
-  })
-  cartGrowthPercent!: number
-
-  @ApiProperty({
-    example: 574.9,
-    description: 'Разница между ростом акции и ростом корзины в процентах',
-  })
-  differencePercent!: number
-
-  @ApiProperty({
-    example: 12500,
-    description: 'Стоимость одной акции на конец выбранного периода',
-  })
-  stockPrice!: number
-
-  @ApiProperty({
-    example: 6843.5,
-    description: 'Стоимость потребительской корзины на конец выбранного периода',
-  })
-  cartPrice!: number
-
-  @ApiProperty({
-    example: 2399,
-    description: 'Стоимость одной бутылки Jameson 0.7 на конец выбранного периода',
-  })
-  jamesonPrice!: number
+  @ApiProperty({ example: 2026 })
+  to!: number
 
   @ApiProperty({
     example: 'RUB',
@@ -269,4 +346,19 @@ export class CompareCartToStockByIdDto {
     description: 'Валюта всех денежных значений в ответе',
   })
   currency!: 'RUB' | 'USD'
+
+  @ApiProperty({ type: StockPriceRangeDto })
+  stock!: StockPriceRangeDto
+
+  @ApiProperty({ type: CartPriceRangeDto })
+  cart!: CartPriceRangeDto
+
+  @ApiProperty({ type: ProductPriceRangeDto })
+  jameson!: ProductPriceRangeDto
+
+  @ApiProperty({ type: PurchasingPowerDto })
+  atFrom!: PurchasingPowerDto
+
+  @ApiProperty({ type: PurchasingPowerDto })
+  atTo!: PurchasingPowerDto
 }

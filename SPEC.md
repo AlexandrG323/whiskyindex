@@ -432,10 +432,15 @@ POST /api/v1/stocks/history
 
 # Analytics
 
-## Сравнение корзины и акций
+Purchasing-power comparison: cart vs stocks over a year range. All money values
+share one `displayCurrency`. On cache miss / incomplete `stock_prices`, Backend
+triggers Import Service, then uses endpoint years (exact `from`/`to`, or nearest
+available after import).
+
+## Сравнение корзины и акций (overview)
 
 ```http
-GET /api/v1/compare
+GET /api/v1/analytics/compare
 ```
 
 ### Query
@@ -444,15 +449,55 @@ GET /api/v1/compare
 from=2007
 to=2026
 currency=rub|usd
-stockIds=uuid,uuid   # опционально: только выбранные акции
+stockIds=uuid,uuid   # опционально; иначе curated-акции
 ```
+
+### Response (shape)
+
+```json
+{
+  "from": 2007,
+  "to": 2026,
+  "currency": "RUB",
+  "cart": { "priceFrom": 3200.5, "priceTo": 9800.0, "growthPercent": 206.1 },
+  "jameson": {
+    "id": "22222222-2222-4222-8222-222222222001",
+    "name": "Виски Jameson 0.7",
+    "priceFrom": 650,
+    "priceTo": 2399,
+    "growthPercent": 269.08
+  },
+  "stocks": [
+    {
+      "id": "11111111-1111-4111-8111-111111111001",
+      "symbol": "GAZP",
+      "companyName": "Газпром",
+      "imageUrl": null,
+      "priceFromYear": 2007,
+      "priceToYear": 2026,
+      "priceFrom": 280.5,
+      "priceTo": 155.2,
+      "growthPercent": -44.67,
+      "atFrom": { "whiskyBottlesPerShare": 0.43, "sharesPerCart": 11.4 },
+      "atTo": { "whiskyBottlesPerShare": 0.06, "sharesPerCart": 63.1 }
+    }
+  ]
+}
+```
+
+Definitions (same display currency):
+
+- `growthPercent` = `((priceTo - priceFrom) / priceFrom) * 100`
+- `whiskyBottlesPerShare` = `stockPrice / jamesonPrice`
+- `sharesPerCart` = `cartPrice / stockPrice`
+- `priceFromYear` / `priceToYear` — years actually used (may differ from query if IPO later / sparse history after import)
 
 ---
 
-## Сравнение конкретной акции
+## Сравнение конкретной акции (deep-dive)
 
 ```http
-GET /api/v1/compare/{id}
+GET /api/v1/analytics/compare/{id}
 ```
 
 ### Query
@@ -463,13 +508,44 @@ to=2026
 currency=rub|usd
 ```
 
-Ответ:
+### Response (shape)
 
-- рост акции;
-- рост корзины;
-- разница;
-- сколько корзин можно было купить;
-- сколько бутылок Jameson можно было купить.
+```json
+{
+  "from": 2007,
+  "to": 2026,
+  "currency": "RUB",
+  "stock": {
+    "id": "...",
+    "symbol": "GAZP",
+    "companyName": "Газпром",
+    "imageUrl": null,
+    "priceFromYear": 2007,
+    "priceToYear": 2026,
+    "priceFrom": 280.5,
+    "priceTo": 155.2,
+    "growthPercent": -44.67
+  },
+  "cart": { "priceFrom": 3200.5, "priceTo": 9800.0, "growthPercent": 206.1 },
+  "jameson": {
+    "id": "22222222-2222-4222-8222-222222222001",
+    "name": "Виски Jameson 0.7",
+    "priceFrom": 650,
+    "priceTo": 2399,
+    "growthPercent": 269.08
+  },
+  "atFrom": { "whiskyBottlesPerShare": 0.43, "sharesPerCart": 11.4 },
+  "atTo": { "whiskyBottlesPerShare": 0.06, "sharesPerCart": 63.1 }
+}
+```
+
+FE copy examples from ratios:
+
+- «В 2007 одну акцию можно было обменять на N бутылок Jameson»
+- «Одна корзина стоила M акций»
+- «Сейчас меньше / больше» — сравнить `atFrom` vs `atTo`
+
+Cart / Jameson on this endpoint are priced at the stock’s actual `priceFromYear` / `priceToYear`.
 
 ---
 
@@ -634,4 +710,5 @@ GET /api/v1/stocks/{id}/history?from=2007&to=2026&currency=rub
 - В каждом денежном ответе API возвращает `nativeCurrency`, `displayCurrency` и при конвертации — `nativeAmount` рядом с `amount`.
 - `image_url` акций хранится в БД и отдаётся как `imageUrl` — FE не зависит от внешних logo-API.
 - Все вычисления — по средним годовым ценам из месячных свечей.
-- Сравнение доходности (`/compare`) считает рост в **одной** `displayCurrency` для всех серий в ответе.
+- Сравнение доходности (`/api/v1/analytics/compare`) считает рост и purchasing-power
+  ratios в **одной** `displayCurrency` для всех серий в ответе.
