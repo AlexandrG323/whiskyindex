@@ -90,8 +90,42 @@ export class StockYearlyPriceDto {
   @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
   displayCurrency!: 'RUB' | 'USD'
 
-  @ApiProperty({ example: 320.5 })
-  price!: number
+  @ApiPropertyOptional({
+    example: 320.5,
+    nullable: true,
+    description: 'null когда цены за год нет: акция ещё не торговалась или данных нет',
+  })
+  price!: number | null
+
+  @ApiProperty({
+    example: 'actual',
+    enum: ['actual', 'carried', 'not_listed', 'unavailable'],
+    description:
+      'actual — цена за запрошенный год; carried — перенесена из priceYear (делистинг или пропуск); ' +
+      'not_listed — год раньше первой сделки; unavailable — данных нет вообще',
+  })
+  priceStatus!: 'actual' | 'carried' | 'not_listed' | 'unavailable'
+
+  @ApiPropertyOptional({
+    example: 2018,
+    nullable: true,
+    description: 'Год, из которого фактически взята цена. Равен запрошенному при actual',
+  })
+  priceYear!: number | null
+
+  @ApiPropertyOptional({
+    example: 2008,
+    nullable: true,
+    description: 'Первый год с ценой (для PM — 2008: IPO в марте 2008)',
+  })
+  listedFrom!: number | null
+
+  @ApiPropertyOptional({
+    example: 2018,
+    nullable: true,
+    description: 'Последний год с ценой (для AVAZ — 2018: делистинг)',
+  })
+  listedTo!: number | null
 
   @ApiProperty({
     example: 'ready',
