@@ -32,6 +32,8 @@ type Stock = {
 const MIN_YEAR = 1998
 const MAX_YEAR = 2026
 const DEFAULT_YEAR = 2007
+/** product_prices starts here; stocks reach back to MIN_YEAR. */
+const PRODUCT_DATA_FROM = 2007
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
 
 async function getJson<T>(url: string): Promise<T> {
@@ -43,13 +45,14 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 function money(amount: number, currency: 'RUB' | 'USD') {
+  const digits = Number.isInteger(amount) ? 0 : 2
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency,
-    // Up to 2dp, none when the value is whole: "1 442 ₽" but "2,64 ₽".
-    // Apple in 1998 is worth pennies, and rounding to whole rubles showed 0.
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    // Either both kopecks or none: "12,90 ₽" not "12,9 ₽", but "1 442 ₽"
+    // rather than "1 442,00 ₽". A half-filled kopeck column reads as a bug.
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   }).format(amount)
 }
 
@@ -89,10 +92,14 @@ export default function App() {
   const [products, setProducts] = useState<CartProduct[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
   const [error, setError] = useState<string | null>(null)
+  // A cold year blocks server-side while prices import from MOEX/Yahoo, which
+  // can take seconds. Without this the page just sat empty and looked broken.
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     setError(null)
+    setLoading(true)
     Promise.all([
       getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}`),
       getJson<Stock[]>(`/api/v1/stocks?year=${year}`),
@@ -113,6 +120,9 @@ export default function App() {
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -124,7 +134,7 @@ export default function App() {
   const missing = products.length - available.length
 
   return (
-    <main>
+    <main className={loading ? 'is-loading' : undefined}>
       <header className="masthead">
         <img src="/icons/logo.webp" alt="" width={48} height={48} />
         <div>
@@ -144,6 +154,13 @@ export default function App() {
       </header>
 
       {error && <p className="error">Не удалось загрузить данные: {error}</p>}
+
+      {loading && products.length === 0 && stocks.length === 0 && (
+        <p className="loading">
+          <span className="spinner" aria-hidden="true" />
+          Загружаем цены за {year}… первый год импортируется с MOEX и Yahoo
+        </p>
+      )}
 
       <section>
         <h2>
@@ -165,6 +182,13 @@ export default function App() {
             </li>
           ))}
         </ul>
+        {!loading && available.length === 0 && (
+          <p className="notice">
+            Цены на продукты собраны с {PRODUCT_DATA_FROM} года. За более ранние годы есть только
+            котировки акций — Росстат публикует цены по категориям, а не по конкретным маркам, и
+            пересчёт по инфляции даёт ошибку до 90%.
+          </p>
+        )}
         {available.length > 0 && (
           <p className="total">
             Итого: <strong>{money(cartTotal, available[0].currency)}</strong>
