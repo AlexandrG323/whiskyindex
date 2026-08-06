@@ -17,21 +17,25 @@ INSERT INTO stocks (
   id, symbol, company_name, country, exchange, source, image_url,
   native_currency, is_curated, is_active, import_status, prices_cached_at, image_cached_at
 ) VALUES
-  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL)
+  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  '/icons/stocks/gazp.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  '/icons/stocks/sber.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  '/icons/stocks/lkoh.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  '/icons/stocks/gmkn.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  '/icons/stocks/rosn.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  '/icons/stocks/avaz.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', '/icons/stocks/aapl.svg',  'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', '/icons/stocks/googl.svg', 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', '/icons/stocks/mcd.svg',   'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', '/icons/stocks/spx.svg',   'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', '/icons/stocks/pm.svg',    'USD', true, true, 'pending', NULL, NULL)
 ON CONFLICT (symbol, exchange) DO UPDATE SET
   company_name = EXCLUDED.company_name,
   country = EXCLUDED.country,
   source = EXCLUDED.source,
+  -- Curated logos are bundled assets, so the seed is their source of truth and
+  -- re-seeding must refresh them. Only rows listed above are touched; a logo
+  -- fetched at resolve time for some other ticker is never overwritten.
+  image_url = EXCLUDED.image_url,
   native_currency = EXCLUDED.native_currency,
   is_curated = EXCLUDED.is_curated,
   is_active = EXCLUDED.is_active,
@@ -43,20 +47,23 @@ ON CONFLICT (symbol, exchange) DO UPDATE SET
 -- ---------------------------------------------------------------------------
 -- Products (fixed UUIDs)
 -- ---------------------------------------------------------------------------
+-- image_url is a root-relative path, not an absolute URL: the SPA and the API
+-- are served from one origin in both dev (Vite) and prod (nginx), so these
+-- resolve as-is with no per-environment config. Files: frontend/public/icons/
 INSERT INTO products (id, name, category, image_url) VALUES
-  ('22222222-2222-4222-8222-222222222001', 'Виски Jameson 0.7',        'alcohol',   NULL),
-  ('22222222-2222-4222-8222-222222222002', 'Кола 2 литра',             'drinks',    NULL),
-  ('22222222-2222-4222-8222-222222222003', 'Сосиски',                  'meat',      NULL),
-  ('22222222-2222-4222-8222-222222222004', 'Пельмени',                 'frozen',    NULL),
-  ('22222222-2222-4222-8222-222222222005', 'Банка кофе Jacobs',        'grocery',   NULL),
-  ('22222222-2222-4222-8222-222222222006', 'Доширак',                  'grocery',   NULL),
-  ('22222222-2222-4222-8222-222222222007', 'Огурцы',                   'produce',   NULL),
-  ('22222222-2222-4222-8222-222222222008', 'Активированный уголь',     'pharmacy',  NULL),
-  ('22222222-2222-4222-8222-222222222009', 'Боржоми',                  'drinks',    NULL),
-  ('22222222-2222-4222-8222-222222222010', 'Картошка',                 'produce',   NULL),
-  ('22222222-2222-4222-8222-222222222011', 'Сигареты Winston',         'tobacco',   NULL),
-  ('22222222-2222-4222-8222-222222222012', 'Копчёная колбаса',         'meat',      NULL),
-  ('22222222-2222-4222-8222-222222222013', 'Майонез',                  'grocery',   NULL)
+  ('22222222-2222-4222-8222-222222222001', 'Виски Jameson 0.7',        'alcohol',   '/icons/jameson.png'),
+  ('22222222-2222-4222-8222-222222222002', 'Кола 2 литра',             'drinks',    '/icons/cola.png'),
+  ('22222222-2222-4222-8222-222222222003', 'Сосиски',                  'meat',      '/icons/sosiski.png'),
+  ('22222222-2222-4222-8222-222222222004', 'Пельмени',                 'frozen',    '/icons/pelmeni.png'),
+  ('22222222-2222-4222-8222-222222222005', 'Банка кофе Jacobs',        'grocery',   '/icons/jacobs.png'),
+  ('22222222-2222-4222-8222-222222222006', 'Доширак',                  'grocery',   '/icons/doshirak.png'),
+  ('22222222-2222-4222-8222-222222222007', 'Огурцы',                   'produce',   '/icons/ogurtsy.png'),
+  ('22222222-2222-4222-8222-222222222008', 'Активированный уголь',     'pharmacy',  '/icons/ugol.png'),
+  ('22222222-2222-4222-8222-222222222009', 'Боржоми',                  'drinks',    '/icons/borjomi.png'),
+  ('22222222-2222-4222-8222-222222222010', 'Картошка',                 'produce',   '/icons/kartoshka.png'),
+  ('22222222-2222-4222-8222-222222222011', 'Сигареты Winston',         'tobacco',   '/icons/winston.png'),
+  ('22222222-2222-4222-8222-222222222012', 'Копчёная колбаса',         'meat',      '/icons/kolbasa.png'),
+  ('22222222-2222-4222-8222-222222222013', 'Майонез',                  'grocery',   '/icons/mayonez.png')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   category = EXCLUDED.category,

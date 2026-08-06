@@ -11,6 +11,12 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "incremental": true,
+    // Keep the build cache inside outDir. nest-cli.json sets deleteOutDir,
+    // which wipes dist/ but would leave a root-level tsconfig.tsbuildinfo
+    // behind — tsc then believes every file is still emitted and skips them,
+    // producing a dist/ with no main.js ("Cannot find module /app/dist/main").
+    // Living in dist/ means the cache is always discarded with the output.
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,

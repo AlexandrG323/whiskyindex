@@ -10,6 +10,69 @@ import type {
   StockYearlyPriceDto,
 } from '../dto/common.dto'
 import { StockImportService } from '../import/stock-import.service'
+import { StockLogoService, type StoredLogo } from './stock-logo.service'
+
+/** Шкала лет приложения — та же, что в seed и в UI. */
+const MIN_YEAR = 2007
+const MAX_YEAR = 2026
+
+type StockYearRow = {
+  id: string
+  symbol: string
+  company_name: string
+  country: string
+  exchange: string
+  source: string
+  native_currency: 'RUB' | 'USD'
+  import_status: 'pending' | 'importing' | 'ready' | 'failed'
+  image_url: string | null
+  prices_cached_at: Date | null
+  first_year: number | null
+  last_year: number | null
+  exact_price: string | null
+  prev_price: string | null
+  prev_year: number | null
+}
+
+/**
+ * Why a stock has no price for a given year — three very different facts that
+ * were previously all rendered as "failed":
+ *
+ * - `not_listed`  the year predates the first trade. Philip Morris spun out of
+ *                 Altria in March 2008, so 2007 is not a failure, it is a
+ *                 company that did not exist. There is no price to show.
+ * - `carried`     the year is past the last trade, or falls in a gap. АвтоВАЗ
+ *                 was delisted in 2018 at ~12 RUB; holding it through 2026
+ *                 leaves you with that final price, so carry it forward rather
+ *                 than showing nothing.
+ * - `unavailable` we genuinely have no data — a real import failure.
+ */
+function resolveYearPrice(
+  row: StockYearRow,
+  year: number,
+): {
+  price: number | null
+  status: 'actual' | 'carried' | 'not_listed' | 'unavailable'
+  priceYear: number | null
+} {
+  if (row.exact_price !== null) {
+    return { price: Number(row.exact_price), status: 'actual', priceYear: year }
+  }
+  // Checked before the carry-forward: a year earlier than everything we hold
+  // has no earlier price to inherit anyway, but being explicit keeps the
+  // "did not exist yet" case from ever being reported as missing data.
+  if (row.first_year !== null && year < Number(row.first_year)) {
+    return { price: null, status: 'not_listed', priceYear: null }
+  }
+  if (row.prev_price !== null) {
+    return {
+      price: Number(row.prev_price),
+      status: 'carried',
+      priceYear: row.prev_year === null ? null : Number(row.prev_year),
+    }
+  }
+  return { price: null, status: 'unavailable', priceYear: null }
+}
 
 /**
  * Stocks читают Postgres. Внешние API — только через StockImportService
@@ -25,7 +88,13 @@ export class StocksService {
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     private readonly stockImport: StockImportService,
+    private readonly stockLogo: StockLogoService,
   ) {}
+
+  /** Bytes for GET /v1/stocks/:id/logo. Null when the ticker has none stored. */
+  getLogo(stockId: string): Promise<StoredLogo | null> {
+    return this.stockLogo.getLogo(stockId)
+  }
 
   async getDefaultStocks(
     year = 2007,
@@ -36,72 +105,29 @@ export class StocksService {
 
     const whereClause = curatedOnly ? 'WHERE s.is_curated = true' : ''
 
-    const { rows: stocks } = await this.pool.query(
-      `
-      SELECT
-        s.id,
-        s.symbol,
-        s.company_name,
-        s.country,
-        s.exchange,
-        s.source,
-        s.native_currency,
-        s.import_status,
-        s.image_url,
-        sp.average_price
-      FROM stocks AS s
-      LEFT JOIN stock_prices AS sp
-        ON sp.stock_id = s.id AND sp.year = $1
-      ${whereClause}
-      ORDER BY s.symbol ASC
-      `,
-      [year],
-    )
-
+    let stocks = await this.queryStocksForYear(whereClause, year)
     if (stocks.length === 0) {
       return []
     }
 
-    // Проверяем, есть ли акции без загруженной цены за этот год
-    const missingPriceStocks = stocks.filter((s) => s.average_price === null)
-
-    // Если есть акции без цены — запускаем импорт для каждой
-    if (missingPriceStocks.length > 0) {
-      for (const stock of missingPriceStocks) {
+    // Импортируем один раз на всю шкалу лет, а не по году за запрос. Годовой
+    // импорт перезапускался на каждый запрос для акции, у которой цены за этот
+    // год не будет никогда (PM в 2007) — и каждый раз падал. prices_cached_at
+    // ставится по завершении импорта и служит признаком "уже пробовали".
+    const needImport = stocks.filter(
+      (s) => s.prices_cached_at === null && s.import_status !== 'importing',
+    )
+    if (needImport.length > 0) {
+      for (const stock of needImport) {
         try {
-          await this.stockImport.importStockById(stock.id, year, year)
+          await this.stockImport.importStockById(stock.id, MIN_YEAR, MAX_YEAR)
         } catch {
-          // Игнорируем ошибки отдельного импорта, чтобы отдавать то, что загрузилось
+          // Импорт одной акции не должен ломать выдачу остальных
         }
       }
-
-      // Перезапрашиваем данные из БД после импорта
-      const retryResult = await this.pool.query(
-        `
-        SELECT
-          s.id,
-          s.symbol,
-          s.company_name,
-          s.country,
-          s.exchange,
-          s.source,
-          s.native_currency,
-          s.import_status,
-          s.image_url,
-          sp.average_price
-        FROM stocks AS s
-        LEFT JOIN stock_prices AS sp
-          ON sp.stock_id = s.id AND sp.year = $1
-        ${whereClause}
-        ORDER BY s.symbol ASC
-        `,
-        [year],
-      )
-
-      stocks.splice(0, stocks.length, ...retryResult.rows)
+      stocks = await this.queryStocksForYear(whereClause, year)
     }
 
-    // Достаем курсы валют
     const { rows: rateRows } = await this.pool.query(
       `
       SELECT year, rate
@@ -116,11 +142,11 @@ export class StocksService {
     const fxRate = rateRows.length > 0 ? Number(rateRows[0].rate) : 1
 
     return stocks.map((row) => {
-      const nativeAmount = row.average_price !== null ? Number(row.average_price) : null
-      let amount = nativeAmount
+      const resolved = resolveYearPrice(row, year)
+      let amount = resolved.price
 
-      if (nativeAmount !== null && row.native_currency !== displayCurrency) {
-        amount = row.native_currency === 'USD' ? nativeAmount * fxRate : nativeAmount / fxRate
+      if (amount !== null && row.native_currency !== displayCurrency) {
+        amount = row.native_currency === 'USD' ? amount * fxRate : amount / fxRate
       }
 
       return {
@@ -135,9 +161,59 @@ export class StocksService {
 
         importStatus: row.import_status,
         imageUrl: row.image_url,
-        price: amount !== null ? Number(amount.toFixed(2)) : 0,
+        price: amount !== null ? Number(amount.toFixed(2)) : null,
+        priceStatus: resolved.status,
+        priceYear: resolved.priceYear,
+        listedFrom: row.first_year === null ? null : Number(row.first_year),
+        listedTo: row.last_year === null ? null : Number(row.last_year),
       }
     })
+  }
+
+  /**
+   * One row per stock with everything needed to resolve a price for `year`:
+   * the exact price if present, the coverage bounds, and the nearest earlier
+   * price to fall back on.
+   */
+  private async queryStocksForYear(whereClause: string, year: number): Promise<StockYearRow[]> {
+    const { rows } = await this.pool.query<StockYearRow>(
+      `
+      SELECT
+        s.id,
+        s.symbol,
+        s.company_name,
+        s.country,
+        s.exchange,
+        s.source,
+        s.native_currency,
+        s.import_status,
+        s.image_url,
+        s.prices_cached_at,
+        cov.first_year,
+        cov.last_year,
+        exact.average_price AS exact_price,
+        prev.average_price AS prev_price,
+        prev.year AS prev_year
+      FROM stocks AS s
+      LEFT JOIN LATERAL (
+        SELECT MIN(year) AS first_year, MAX(year) AS last_year
+        FROM stock_prices WHERE stock_id = s.id
+      ) AS cov ON true
+      LEFT JOIN stock_prices AS exact
+        ON exact.stock_id = s.id AND exact.year = $1
+      LEFT JOIN LATERAL (
+        SELECT average_price, year
+        FROM stock_prices
+        WHERE stock_id = s.id AND year <= $1
+        ORDER BY year DESC
+        LIMIT 1
+      ) AS prev ON true
+      ${whereClause}
+      ORDER BY s.symbol ASC
+      `,
+      [year],
+    )
+    return rows
   }
 
   async getById(id: string): Promise<StockDetailDto> {
@@ -533,6 +609,10 @@ export class StocksService {
 
       // Запускаем импорт для новой акции
       await this.stockImport.importStockById(newStock.id)
+
+      // Логотип: best-effort, не влияет на импорт цен. Сервис не бросает —
+      // акция без логотипа полностью работоспособна.
+      await this.stockLogo.fetchAndStore(newStock.id, symbol)
 
       // Запрашиваем обновленный статус
       const updated = await this.pool.query(

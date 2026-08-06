@@ -1,13 +1,25 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+} from '@nestjs/common'
 import {
   ApiAcceptedResponse,
   ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger'
+import type { Response } from 'express'
 import {
   ResolveStockDto,
   ResolveStockResponseDto,
@@ -132,6 +144,42 @@ export class StocksController {
       Number.isFinite(parsedTo) ? parsedTo : 2026,
       currency === 'usd' ? 'usd' : 'rub',
     )
+  }
+
+  /**
+   * GET /api/v1/stocks/{id}/logo
+   *
+   * Serves a logo fetched at resolve time. Curated stocks do not use this —
+   * their logos are bundled files that nginx serves directly, which is both
+   * faster and one less moving part. Declared before :id so it is not
+   * swallowed by it.
+   */
+  @Get(':id/logo')
+  @ApiOperation({
+    summary: 'Логотип акции',
+    description:
+      'Байты из stock_logos (загружены при resolve). У curated-акций logo — статический файл, этот эндпоинт им не нужен.',
+  })
+  @ApiParam({ name: 'id', example: '11111111-1111-4111-8111-111111111007' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  @ApiOkResponse({ description: 'Изображение логотипа' })
+  async getLogo(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const logo = await this.stocksService.getLogo(id)
+    if (!logo) {
+      throw new NotFoundException(`No stored logo for stock "${id}"`)
+    }
+    res.set({
+      'Content-Type': logo.contentType,
+      'Cache-Control': 'public, max-age=604800, must-revalidate',
+      // Third-party bytes served from our origin: never let a browser
+      // reinterpret them as anything but the image type we validated.
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'",
+    })
+    return new StreamableFile(logo.bytes)
   }
 
   /**

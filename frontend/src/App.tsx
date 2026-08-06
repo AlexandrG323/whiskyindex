@@ -1,43 +1,166 @@
 import { useEffect, useState } from 'react'
 
-type Product = { id: string; name: string }
-type Stock = { ticker: string; name: string }
+/** Matches ProductYearlyPriceDto — GET /api/v1/products/cart */
+type CartProduct = {
+  id: string
+  name: string
+  imageUrl: string | null
+  price: number
+  currency: 'RUB' | 'USD'
+}
+
+/** Matches StockYearlyPriceDto — GET /api/v1/stocks */
+type Stock = {
+  id: string
+  symbol: string
+  companyName: string
+  imageUrl: string | null
+  price: number | null
+  priceStatus: 'actual' | 'carried' | 'not_listed' | 'unavailable'
+  priceYear: number | null
+  listedFrom: number | null
+  listedTo: number | null
+  displayCurrency: 'RUB' | 'USD'
+  importStatus: 'pending' | 'importing' | 'ready' | 'failed'
+}
+
+const MIN_YEAR = 2007
+const MAX_YEAR = 2026
+const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`${url} → ${res.status} ${res.statusText}`)
+  }
+  return (await res.json()) as T
+}
+
+function money(amount: number, currency: 'RUB' | 'USD') {
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+/**
+ * A stock with no price for the selected year is not automatically an error.
+ * "Не торговалась" (listed later) and a carried-forward delisting price are
+ * facts about the company, and reading either as a failed import misleads.
+ */
+function StockPrice({ stock }: { stock: Stock }) {
+  if (stock.priceStatus === 'not_listed') {
+    return (
+      <span className="price muted-price">
+        не торговалась
+        {stock.listedFrom !== null && <small>с {stock.listedFrom}</small>}
+      </span>
+    )
+  }
+
+  if (stock.price === null) {
+    return <span className="price muted-price">нет данных</span>
+  }
+
+  return (
+    <span className="price">
+      {money(stock.price, stock.displayCurrency)}
+      {stock.priceStatus === 'carried' && stock.priceYear !== null && (
+        <small>
+          {stock.listedTo === stock.priceYear ? 'делистинг' : 'цена'} {stock.priceYear}
+        </small>
+      )}
+    </span>
+  )
+}
 
 export default function App() {
-  const [products, setProducts] = useState<Product[]>([])
+  const [year, setYear] = useState(MIN_YEAR)
+  const [products, setProducts] = useState<CartProduct[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/products')
-      .then((r) => r.json())
-      .then(setProducts)
-      .catch(() => setProducts([]))
-    fetch('/api/stocks')
-      .then((r) => r.json())
-      .then(setStocks)
-      .catch(() => setStocks([]))
-  }, [])
+    let cancelled = false
+    setError(null)
+    Promise.all([
+      getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}`),
+      getJson<Stock[]>(`/api/v1/stocks?year=${year}`),
+    ])
+      .then(([cart, listed]) => {
+        // A slow year's response must not overwrite a newer selection.
+        if (cancelled) return
+        setProducts(cart)
+        setStocks(listed)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [year])
+
+  const cartTotal = products.reduce((sum, p) => sum + p.price, 0)
 
   return (
     <main>
-      <h1>Whisky Index</h1>
-      <p>Бутылка или Портфель? Сравни корзину продуктов с портфелем акций.</p>
+      <header className="masthead">
+        <img src="/icons/logo.webp" alt="" width={48} height={48} />
+        <div>
+          <h1>Whisky Index</h1>
+          <p className="muted">Бутылка или портфель?</p>
+        </div>
+        <label className="year-picker">
+          Год
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </label>
+      </header>
+
+      {error && <p className="error">Не удалось загрузить данные: {error}</p>}
 
       <section>
-        <h2>Продуктовая корзина</h2>
-        <ul>
+        <h2>
+          Корзина скуфа <span className="muted">({year})</span>
+        </h2>
+        <ul className="grid">
           {products.map((p) => (
-            <li key={p.id}>{p.name}</li>
+            <li key={p.id} className="card">
+              {p.imageUrl && <img src={p.imageUrl} alt="" width={72} height={72} loading="lazy" />}
+              <span className="name">{p.name}</span>
+              <span className="price">{money(p.price, p.currency)}</span>
+            </li>
           ))}
         </ul>
+        {products.length > 0 && (
+          <p className="total">
+            Итого: <strong>{money(cartTotal, products[0].currency)}</strong>
+          </p>
+        )}
       </section>
 
       <section>
-        <h2>Акции (2007)</h2>
-        <ul>
+        <h2>
+          Акции <span className="muted">({year})</span>
+        </h2>
+        <ul className="rows">
           {stocks.map((s) => (
-            <li key={s.ticker}>
-              {s.name} ({s.ticker})
+            <li key={s.id}>
+              {s.imageUrl ? (
+                <img src={s.imageUrl} alt="" width={28} height={28} loading="lazy" />
+              ) : (
+                <span className="logo-placeholder">{s.symbol.slice(0, 2)}</span>
+              )}
+              <span className="symbol">{s.symbol}</span>
+              <span>{s.companyName}</span>
+              <StockPrice stock={s} />
             </li>
           ))}
         </ul>
