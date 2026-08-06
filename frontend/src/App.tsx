@@ -46,7 +46,10 @@ function money(amount: number, currency: 'RUB' | 'USD') {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0,
+    // Up to 2dp, none when the value is whole: "1 442 ₽" but "2,64 ₽".
+    // Apple in 1998 is worth pennies, and rounding to whole rubles showed 0.
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -98,7 +101,14 @@ export default function App() {
         // A slow year's response must not overwrite a newer selection.
         if (cancelled) return
         setProducts(cart)
-        setStocks(listed)
+        // Priced stocks first; the ones that were not trading yet sink to the
+        // bottom instead of interrupting the list alphabetically.
+        setStocks(
+          [...listed].sort((a, b) => {
+            const rank = (s: Stock) => (s.price === null ? 1 : 0)
+            return rank(a) - rank(b) || a.symbol.localeCompare(b.symbol)
+          }),
+        )
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))

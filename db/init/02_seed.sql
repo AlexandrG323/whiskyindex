@@ -20,7 +20,7 @@ INSERT INTO stocks (
   ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  '/icons/stocks/gazp.svg',  'RUB', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  '/icons/stocks/sber.svg',  'RUB', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  '/icons/stocks/lkoh.svg',  'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  '/icons/stocks/gmkn.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  '/icons/stocks/gmkn.png',  'RUB', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  '/icons/stocks/rosn.svg',  'RUB', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  '/icons/stocks/avaz.png',  'RUB', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', '/icons/stocks/aapl.svg',  'USD', true, true, 'pending', NULL, NULL),
@@ -90,6 +90,15 @@ SELECT
   'seed'
 FROM (
   VALUES
+    (1998,  9.71000000),
+    (1999, 24.62000000),
+    (2000, 28.13000000),
+    (2001, 29.17000000),
+    (2002, 31.35000000),
+    (2003, 30.69000000),
+    (2004, 28.81000000),
+    (2005, 28.28000000),
+    (2006, 27.19000000),
     (2007, 25.58000000),
     (2008, 24.85000000),
     (2009, 31.72000000),

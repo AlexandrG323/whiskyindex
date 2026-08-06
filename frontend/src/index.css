@@ -18,7 +18,8 @@ body {
 }
 
 #root {
-  max-width: 960px;
+  /* Wider so 7 product cards fit without squeezing names onto three lines. */
+  max-width: 1240px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -84,7 +85,7 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(154px, 1fr));
   gap: 0.75rem;
   padding: 0;
   margin: 0;
