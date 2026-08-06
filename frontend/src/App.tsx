@@ -202,6 +202,11 @@ export default function App() {
         <h2>
           Акции <span className="muted">({year})</span>
         </h2>
+        <p className="notice">
+          Акции США и S&amp;P 500 — с учётом реинвестирования дивидендов. Российские акции и Индекс
+          МосБиржи — только цена: у MOEX нет данных по дивидендам за весь период, поэтому их
+          доходность здесь занижена.
+        </p>
         <ul className="rows">
           {stocks.map((s) => (
             <li key={s.id}>
