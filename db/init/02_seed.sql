@@ -63,7 +63,8 @@ INSERT INTO products (id, name, category, image_url) VALUES
   ('22222222-2222-4222-8222-222222222010', 'Картошка 1 кг',                'produce',  '/icons/kartoshka.png'),
   ('22222222-2222-4222-8222-222222222011', 'Сигареты Winston',             'tobacco',  '/icons/winston.png'),
   ('22222222-2222-4222-8222-222222222012', 'Копчёная колбаса 1 кг',        'meat',     '/icons/kolbasa.png'),
-  ('22222222-2222-4222-8222-222222222013', 'Майонез 630 г',                'grocery',  '/icons/mayonez.png')
+  ('22222222-2222-4222-8222-222222222013', 'Майонез 630 г',                'grocery',  '/icons/mayonez.png'),
+  ('22222222-2222-4222-8222-222222222014', 'Пиво Жигулёвское 0.45 л',      'alcohol',  '/icons/beer.png')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   category = EXCLUDED.category,
