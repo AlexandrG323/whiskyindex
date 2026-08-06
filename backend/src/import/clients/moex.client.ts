@@ -9,6 +9,20 @@ type MoexCandlesResponse = {
 }
 
 /**
+ * Индексы живут в market=index, а не shares.
+ *
+ * Это единственный способ дотянуться до 1998: у самих акций истории нет —
+ * ISS отдаёт свечи от даты регистрации текущего выпуска, поэтому GAZP
+ * начинается с 2006 (допуск на ММВБ), SBER с 2007 (сплит 1:1000). Индексы
+ * же непрерывны с 1997 и уже учитывают корпоративные действия.
+ */
+const MOEX_INDEX_SYMBOLS = new Set(['IMOEX', 'RTSI'])
+
+function moexMarket(symbol: string): 'shares' | 'index' {
+  return MOEX_INDEX_SYMBOLS.has(symbol.toUpperCase()) ? 'index' : 'shares'
+}
+
+/**
  * Клиент MOEX ISS (российские акции: GAZP, SBER, …).
  *
  * Документация: https://iss.moex.com/iss/reference/
@@ -64,7 +78,9 @@ export class MoexClient {
     let hasMore = true
 
     while (hasMore) {
-      const url = `https://iss.moex.com/iss/engines/stock/markets/shares/securities/${encodeURIComponent(
+      const url = `https://iss.moex.com/iss/engines/stock/markets/${moexMarket(
+        symbol,
+      )}/securities/${encodeURIComponent(
         symbol,
       )}/candles.json?from=${from}&till=${till}&interval=31&start=${start}`
 

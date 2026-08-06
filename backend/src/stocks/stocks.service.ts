@@ -1,5 +1,12 @@
-import { Inject, Injectable, NotFoundException, RequestTimeoutException } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  RequestTimeoutException,
+} from '@nestjs/common'
 import type { Pool } from 'pg'
+import { MAX_YEAR, MIN_YEAR } from '../common/years'
 import { PG_POOL } from '../database/database.constants'
 import type {
   ResolveStockDto,
@@ -11,10 +18,6 @@ import type {
 } from '../dto/common.dto'
 import { StockImportService } from '../import/stock-import.service'
 import { StockLogoService, type StoredLogo } from './stock-logo.service'
-
-/** Шкала лет приложения — та же, что в seed и в UI. */
-const MIN_YEAR = 2007
-const MAX_YEAR = 2026
 
 type StockYearRow = {
   id: string
@@ -85,6 +88,8 @@ function resolveYearPrice(
  */
 @Injectable()
 export class StocksService {
+  private readonly logger = new Logger(StocksService.name)
+
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     private readonly stockImport: StockImportService,
@@ -139,14 +144,25 @@ export class StocksService {
       [year],
     )
 
-    const fxRate = rateRows.length > 0 ? Number(rateRows[0].rate) : 1
+    // null, not 1. Falling back to a rate of 1 silently reports a USD price as
+    // if it were rubles — which is exactly what happened for 1998-2006 before
+    // those years were seeded: Apple's 1998 price rendered as 0 RUB instead of
+    // roughly 2.6. A missing rate now yields no price rather than a wrong one.
+    const fxRate = rateRows.length > 0 ? Number(rateRows[0].rate) : null
 
     return stocks.map((row) => {
       const resolved = resolveYearPrice(row, year)
       let amount = resolved.price
+      let status = resolved.status
 
       if (amount !== null && row.native_currency !== displayCurrency) {
-        amount = row.native_currency === 'USD' ? amount * fxRate : amount / fxRate
+        if (fxRate === null) {
+          this.logger.warn(`No USD/RUB rate for ${year}; cannot price ${row.symbol}`)
+          amount = null
+          status = 'unavailable'
+        } else {
+          amount = row.native_currency === 'USD' ? amount * fxRate : amount / fxRate
+        }
       }
 
       return {
@@ -162,7 +178,7 @@ export class StocksService {
         importStatus: row.import_status,
         imageUrl: row.image_url,
         price: amount !== null ? Number(amount.toFixed(2)) : null,
-        priceStatus: resolved.status,
+        priceStatus: status,
         priceYear: resolved.priceYear,
         listedFrom: row.first_year === null ? null : Number(row.first_year),
         listedTo: row.last_year === null ? null : Number(row.last_year),

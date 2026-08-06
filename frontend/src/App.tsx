@@ -5,7 +5,9 @@ type CartProduct = {
   id: string
   name: string
   imageUrl: string | null
-  price: number
+  price: number | null
+  priceStatus: 'actual' | 'not_yet' | 'unavailable'
+  availableFrom: number | null
   currency: 'RUB' | 'USD'
 }
 
@@ -24,8 +26,12 @@ type Stock = {
   importStatus: 'pending' | 'importing' | 'ready' | 'failed'
 }
 
-const MIN_YEAR = 2007
+// 1998 is the ruble denomination — before it prices are in millions of old
+// rubles. 2007 stays the default: it is the first year the whole curated
+// stock set has real data (every Russian share starts 2006 or later).
+const MIN_YEAR = 1998
 const MAX_YEAR = 2026
+const DEFAULT_YEAR = 2007
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
 
 async function getJson<T>(url: string): Promise<T> {
@@ -37,10 +43,14 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 function money(amount: number, currency: 'RUB' | 'USD') {
+  const digits = Number.isInteger(amount) ? 0 : 2
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0,
+    // Either both kopecks or none: "12,90 ₽" not "12,9 ₽", but "1 442 ₽"
+    // rather than "1 442,00 ₽". A half-filled kopeck column reads as a bug.
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
   }).format(amount)
 }
 
@@ -76,14 +86,18 @@ function StockPrice({ stock }: { stock: Stock }) {
 }
 
 export default function App() {
-  const [year, setYear] = useState(MIN_YEAR)
+  const [year, setYear] = useState(DEFAULT_YEAR)
   const [products, setProducts] = useState<CartProduct[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
   const [error, setError] = useState<string | null>(null)
+  // A cold year blocks server-side while prices import from MOEX/Yahoo, which
+  // can take seconds. Without this the page just sat empty and looked broken.
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     setError(null)
+    setLoading(true)
     Promise.all([
       getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}`),
       getJson<Stock[]>(`/api/v1/stocks?year=${year}`),
@@ -92,20 +106,33 @@ export default function App() {
         // A slow year's response must not overwrite a newer selection.
         if (cancelled) return
         setProducts(cart)
-        setStocks(listed)
+        // Priced stocks first; the ones that were not trading yet sink to the
+        // bottom instead of interrupting the list alphabetically.
+        setStocks(
+          [...listed].sort((a, b) => {
+            const rank = (s: Stock) => (s.price === null ? 1 : 0)
+            return rank(a) - rank(b) || a.symbol.localeCompare(b.symbol)
+          }),
+        )
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
     }
   }, [year])
 
-  const cartTotal = products.reduce((sum, p) => sum + p.price, 0)
+  // Products that did not exist yet are excluded rather than counted as zero.
+  const available = products.filter((p) => p.price !== null)
+  const cartTotal = available.reduce((sum, p) => sum + (p.price ?? 0), 0)
+  const missing = products.length - available.length
 
   return (
-    <main>
+    <main className={loading ? 'is-loading' : undefined}>
       <header className="masthead">
         <img src="/icons/logo.webp" alt="" width={48} height={48} />
         <div>
@@ -126,22 +153,37 @@ export default function App() {
 
       {error && <p className="error">Не удалось загрузить данные: {error}</p>}
 
+      {loading && products.length === 0 && stocks.length === 0 && (
+        <p className="loading">
+          <span className="spinner" aria-hidden="true" />
+          Загружаем цены за {year}… первый год импортируется с MOEX и Yahoo
+        </p>
+      )}
+
       <section>
         <h2>
           Корзина скуфа <span className="muted">({year})</span>
         </h2>
         <ul className="grid">
           {products.map((p) => (
-            <li key={p.id} className="card">
+            <li key={p.id} className={p.price === null ? 'card card-muted' : 'card'}>
               {p.imageUrl && <img src={p.imageUrl} alt="" width={72} height={72} loading="lazy" />}
               <span className="name">{p.name}</span>
-              <span className="price">{money(p.price, p.currency)}</span>
+              {p.price !== null ? (
+                <span className="price">{money(p.price, p.currency)}</span>
+              ) : (
+                <span className="price muted-price">
+                  {p.priceStatus === 'not_yet' ? 'ещё не продавался' : 'нет данных'}
+                  {p.availableFrom !== null && <small>с {p.availableFrom}</small>}
+                </span>
+              )}
             </li>
           ))}
         </ul>
-        {products.length > 0 && (
+        {available.length > 0 && (
           <p className="total">
-            Итого: <strong>{money(cartTotal, products[0].currency)}</strong>
+            Итого: <strong>{money(cartTotal, available[0].currency)}</strong>
+            {missing > 0 && <small> — {missing} поз. ещё не в продаже</small>}
           </p>
         )}
       </section>

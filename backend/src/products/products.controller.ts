@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger'
+import { MAX_YEAR, MIN_YEAR, parseYear } from '../common/years'
 import { ProductDto, ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
 import { ProductsService } from './products.service'
 
@@ -44,11 +45,8 @@ export class ProductsController {
     @Query('year') year?: string,
     @Query('currency') currency?: 'rub' | 'usd',
   ): Promise<ProductYearlyPriceDto[]> {
-    const parsedYear = year ? Number(year) : 2007
-    return this.productsService.getCart(
-      Number.isFinite(parsedYear) ? parsedYear : 2007,
-      currency === 'usd' ? 'usd' : 'rub',
-    )
+    const parsedYear = parseYear(year)
+    return this.productsService.getCart(parsedYear, currency === 'usd' ? 'usd' : 'rub')
   }
 
   /**
@@ -81,12 +79,12 @@ export class ProductsController {
     @Query('to') to?: string,
     @Query('currency') currency?: 'rub' | 'usd',
   ): Promise<ProductHistoryDto> {
-    const parsedFrom = from ? Number(from) : 2007
-    const parsedTo = to ? Number(to) : 2026
+    const parsedFrom = parseYear(from, MIN_YEAR)
+    const parsedTo = parseYear(to, MAX_YEAR)
     return this.productsService.getHistory(
       id,
-      Number.isFinite(parsedFrom) ? parsedFrom : 2007,
-      Number.isFinite(parsedTo) ? parsedTo : 2026,
+      parsedFrom,
+      parsedTo,
       currency === 'usd' ? 'usd' : 'rub',
     )
   }

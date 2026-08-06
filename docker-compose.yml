@@ -50,12 +50,24 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development
     container_name: whiskyindex_frontend
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      # Inside compose the API is a service name, not localhost.
+      VITE_API_PROXY: http://api:3000
     ports:
-      - "5173:80"
+      - "5173:5173"
+    # Only sources, never node_modules — mounting the whole directory would
+    # shadow the image's installed dependencies with the host's.
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
 
 volumes:
   pgdata:

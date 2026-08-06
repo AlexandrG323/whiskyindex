@@ -12,6 +12,9 @@ type YahooChartResponse = {
           low?: (number | null)[]
           close?: (number | null)[]
         }>
+        adjclose?: Array<{
+          adjclose?: (number | null)[]
+        }>
       }
     }>
     error?: {
@@ -112,12 +115,19 @@ export class YahooClient {
 
     const timestamps = result.timestamp
     const quote = result.indicators.quote[0]
+    // Two series, deliberately kept apart. quote.close is the split-adjusted
+    // share price — what it actually cost, and what the UI shows. adjclose adds
+    // reinvested dividends and is only meaningful as a ratio between two dates:
+    // Exxon's 2007 price was $83.83, its total-return value $43.13. Displaying
+    // the latter as a price is wrong by half.
+    const adjusted = result.indicators.adjclose?.[0]?.adjclose
     const candles: MonthlyCandle[] = []
 
     for (let i = 0; i < timestamps.length; i++) {
       const close = quote.close?.[i]
       if (close === null || close === undefined) continue
 
+      const adj = adjusted?.[i]
       const open = quote.open?.[i] ?? close
       const high = quote.high?.[i] ?? close
       const low = quote.low?.[i] ?? close
@@ -129,6 +139,7 @@ export class YahooClient {
         high: Number(high),
         low: Number(low),
         close: Number(close),
+        adjClose: adj === null || adj === undefined ? undefined : Number(adj),
       })
     }
 
