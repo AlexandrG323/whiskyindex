@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException, RequestTimeoutException } from '@nestjs/common'
 import type { Pool } from 'pg'
+import { MAX_YEAR, MIN_YEAR } from '../common/years'
 import { PG_POOL } from '../database/database.constants'
 import type {
   ResolveStockDto,
@@ -11,10 +12,6 @@ import type {
 } from '../dto/common.dto'
 import { StockImportService } from '../import/stock-import.service'
 import { StockLogoService, type StoredLogo } from './stock-logo.service'
-
-/** Шкала лет приложения — та же, что в seed и в UI. */
-const MIN_YEAR = 2007
-const MAX_YEAR = 2026
 
 type StockYearRow = {
   id: string

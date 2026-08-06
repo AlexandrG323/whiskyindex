@@ -19,8 +19,28 @@ export class ProductYearlyPriceDto {
   })
   imageUrl!: string | null
 
-  @ApiProperty({ example: 650 })
-  price!: number
+  @ApiPropertyOptional({
+    example: 650,
+    nullable: true,
+    description: 'null когда товара ещё не было в продаже в этом году',
+  })
+  price!: number | null
+
+  @ApiProperty({
+    example: 'actual',
+    enum: ['actual', 'not_yet', 'unavailable'],
+    description:
+      'actual — цена за год; not_yet — товар появился позже (Доширак с 2005), в сумму корзины не входит; ' +
+      'unavailable — данных за год нет',
+  })
+  priceStatus!: 'actual' | 'not_yet' | 'unavailable'
+
+  @ApiPropertyOptional({
+    example: 2005,
+    nullable: true,
+    description: 'Год появления товара на российском рынке, если он позже начала шкалы',
+  })
+  availableFrom!: number | null
 
   @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
   currency!: 'RUB' | 'USD'

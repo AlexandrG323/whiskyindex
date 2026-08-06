@@ -103,6 +103,17 @@ h2 {
   text-align: center;
 }
 
+/* A product that did not exist yet still occupies its slot — dimmed so the
+   grid keeps its shape without the item reading as part of the basket. */
+.card-muted {
+  opacity: 0.45;
+}
+
+.total small {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
 .card .name {
   font-size: 0.75rem;
   color: var(--muted);

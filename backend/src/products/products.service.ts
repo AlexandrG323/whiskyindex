@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
+import { DEFAULT_YEAR } from '../common/years'
 import { PG_POOL } from '../database/database.constants'
 import { ProductDto, ProductHistoryDto, ProductYearlyPriceDto } from '../dto/common.dto'
 
@@ -7,7 +8,8 @@ type CartRow = {
   id: string
   name: string
   image_url: string | null
-  price: string
+  available_from: number | null
+  price: string | null
   currency: 'RUB' | 'USD'
 }
 
@@ -27,21 +29,29 @@ export class ProductsService {
     return rows.map((row) => ({ id: row.id, name: row.name, imageUrl: row.image_url }))
   }
 
-  async getCart(year = 2007, currency: 'rub' | 'usd' = 'rub'): Promise<ProductYearlyPriceDto[]> {
+  async getCart(
+    year = DEFAULT_YEAR,
+    currency: 'rub' | 'usd' = 'rub',
+  ): Promise<ProductYearlyPriceDto[]> {
     const targetCurrency = currency === 'usd' ? 'USD' : 'RUB'
+    // LEFT JOIN, not JOIN: a product with no price for the year still belongs
+    // in the response so the UI can say why it is missing. Inner-joining hid
+    // Доширак entirely for pre-2005 years instead of explaining it.
     const { rows } = await this.pool.query<CartRow>(
       `
       SELECT
         p.id,
         p.name,
         p.image_url,
+        p.available_from,
         CASE
+          WHEN pp.average_price IS NULL THEN NULL
           WHEN $2::text = 'USD' THEN round(pp.average_price / er.rate, 6)
           ELSE pp.average_price
         END AS price,
         $2::text AS currency
       FROM products p
-      JOIN product_prices pp
+      LEFT JOIN product_prices pp
         ON pp.product_id = p.id
        AND pp.year = $1
       LEFT JOIN exchange_rates er
@@ -55,17 +65,26 @@ export class ProductsService {
     )
     if (rows.length === 0) {
       throw new NotFoundException(
-        `No product prices found for year ${year}` +
+        `No products found for year ${year}` +
           (targetCurrency === 'USD' ? ' (or missing USD/RUB rate)' : ''),
       )
     }
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      imageUrl: row.image_url,
-      price: Number(row.price),
-      currency: row.currency,
-    }))
+    return rows.map((row) => {
+      const availableFrom = row.available_from === null ? null : Number(row.available_from)
+      const notYet = availableFrom !== null && year < availableFrom
+      return {
+        id: row.id,
+        name: row.name,
+        imageUrl: row.image_url,
+        // Deliberately null rather than the real price: Доширак had a price in
+        // 2007, but quoting it for 2003 would put a product on the shelf a
+        // year before it existed.
+        price: notYet || row.price === null ? null : Number(row.price),
+        priceStatus: notYet ? 'not_yet' : row.price === null ? 'unavailable' : 'actual',
+        availableFrom,
+        currency: row.currency,
+      }
+    })
   }
 
   /**
@@ -83,7 +102,7 @@ export class ProductsService {
    */
   async getHistory(
     id: string,
-    from = 2007,
+    from = DEFAULT_YEAR,
     to = 2026,
     currency: 'rub' | 'usd' = 'rub',
   ): Promise<ProductHistoryDto> {

@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import type { Response } from 'express'
+import { MAX_YEAR, MIN_YEAR, parseYear } from '../common/years'
 import {
   ResolveStockDto,
   ResolveStockResponseDto,
@@ -68,9 +69,9 @@ export class StocksController {
     @Query('currency') currency?: 'rub' | 'usd',
     @Query('curated_only') curatedOnly?: string,
   ): Promise<StockYearlyPriceDto[]> {
-    const parsedYear = year ? Number(year) : 2007
+    const parsedYear = parseYear(year)
     return this.stocksService.getDefaultStocks(
-      Number.isFinite(parsedYear) ? parsedYear : 2007,
+      parsedYear,
       currency === 'usd' ? 'usd' : 'rub',
       curatedOnly === 'true' || curatedOnly === '1',
     )
@@ -136,12 +137,12 @@ export class StocksController {
     @Query('to') to?: string,
     @Query('currency') currency?: 'rub' | 'usd',
   ): Promise<StockHistoryDto> {
-    const parsedFrom = from ? Number(from) : 2007
-    const parsedTo = to ? Number(to) : 2026
+    const parsedFrom = parseYear(from, MIN_YEAR)
+    const parsedTo = parseYear(to, MAX_YEAR)
     return this.stocksService.getHistory(
       id,
-      Number.isFinite(parsedFrom) ? parsedFrom : 2007,
-      Number.isFinite(parsedTo) ? parsedTo : 2026,
+      parsedFrom,
+      parsedTo,
       currency === 'usd' ? 'usd' : 'rub',
     )
   }

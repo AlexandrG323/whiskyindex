@@ -60,8 +60,16 @@ CREATE TABLE IF NOT EXISTS products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(255) NOT NULL,
   category varchar(64) NOT NULL,
-  image_url text
+  image_url text,
+  -- Year the product first existed on Russian shelves. NULL = assume it always
+  -- did. Доширак began Russian production in 2005, so a 2003 basket that
+  -- included it would be inventing history — the same "not listed yet" problem
+  -- stocks have, and it is handled the same way: shown as unavailable and left
+  -- out of the basket total rather than back-filled with a made-up price.
+  available_from smallint CHECK (available_from BETWEEN 1990 AND 2100)
 );
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS available_from smallint;
 
 CREATE TABLE IF NOT EXISTS product_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

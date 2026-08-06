@@ -5,7 +5,9 @@ type CartProduct = {
   id: string
   name: string
   imageUrl: string | null
-  price: number
+  price: number | null
+  priceStatus: 'actual' | 'not_yet' | 'unavailable'
+  availableFrom: number | null
   currency: 'RUB' | 'USD'
 }
 
@@ -24,8 +26,12 @@ type Stock = {
   importStatus: 'pending' | 'importing' | 'ready' | 'failed'
 }
 
-const MIN_YEAR = 2007
+// 1998 is the ruble denomination — before it prices are in millions of old
+// rubles. 2007 stays the default: it is the first year the whole curated
+// stock set has real data (every Russian share starts 2006 or later).
+const MIN_YEAR = 1998
 const MAX_YEAR = 2026
+const DEFAULT_YEAR = 2007
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
 
 async function getJson<T>(url: string): Promise<T> {
@@ -76,7 +82,7 @@ function StockPrice({ stock }: { stock: Stock }) {
 }
 
 export default function App() {
-  const [year, setYear] = useState(MIN_YEAR)
+  const [year, setYear] = useState(DEFAULT_YEAR)
   const [products, setProducts] = useState<CartProduct[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -102,7 +108,10 @@ export default function App() {
     }
   }, [year])
 
-  const cartTotal = products.reduce((sum, p) => sum + p.price, 0)
+  // Products that did not exist yet are excluded rather than counted as zero.
+  const available = products.filter((p) => p.price !== null)
+  const cartTotal = available.reduce((sum, p) => sum + (p.price ?? 0), 0)
+  const missing = products.length - available.length
 
   return (
     <main>
@@ -132,16 +141,24 @@ export default function App() {
         </h2>
         <ul className="grid">
           {products.map((p) => (
-            <li key={p.id} className="card">
+            <li key={p.id} className={p.price === null ? 'card card-muted' : 'card'}>
               {p.imageUrl && <img src={p.imageUrl} alt="" width={72} height={72} loading="lazy" />}
               <span className="name">{p.name}</span>
-              <span className="price">{money(p.price, p.currency)}</span>
+              {p.price !== null ? (
+                <span className="price">{money(p.price, p.currency)}</span>
+              ) : (
+                <span className="price muted-price">
+                  {p.priceStatus === 'not_yet' ? 'ещё не продавался' : 'нет данных'}
+                  {p.availableFrom !== null && <small>с {p.availableFrom}</small>}
+                </span>
+              )}
             </li>
           ))}
         </ul>
-        {products.length > 0 && (
+        {available.length > 0 && (
           <p className="total">
-            Итого: <strong>{money(cartTotal, products[0].currency)}</strong>
+            Итого: <strong>{money(cartTotal, available[0].currency)}</strong>
+            {missing > 0 && <small> — {missing} поз. ещё не в продаже</small>}
           </p>
         )}
       </section>

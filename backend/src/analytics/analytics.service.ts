@@ -133,8 +133,15 @@ export class AnalyticsService {
       )
     }
 
+    // Jameson anchors every ratio in this endpoint, so a null price is fatal
+    // here in a way it is not for the basket as a whole.
     const jamesonFrom = jamesonItemFrom.price
     const jamesonTo = jamesonItemTo.price
+    if (jamesonFrom === null || jamesonTo === null) {
+      throw new NotFoundException(
+        `Jameson has no price for ${from} or ${to}; cannot compute purchasing power`,
+      )
+    }
     const jameson: ProductPriceRangeDto = {
       id: jamesonItemFrom.id,
       name: jamesonItemFrom.name,
@@ -204,8 +211,13 @@ export class AnalyticsService {
     }
   }
 
+  /**
+   * Basket total for a year. Items with no price are skipped rather than
+   * counted as zero — a product that did not exist yet (Доширак before 2005)
+   * must not drag the basket down and invent deflation.
+   */
   private sumCart(items: ProductYearlyPriceDto[]): number {
-    return items.reduce((sum, item) => sum + item.price, 0)
+    return items.reduce((sum, item) => sum + (item.price ?? 0), 0)
   }
 
   private growthPercent(priceFrom: number, priceTo: number): number {
