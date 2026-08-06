@@ -117,12 +117,31 @@ h2 {
 
 .rows li {
   display: grid;
-  grid-template-columns: 4.5rem 1fr auto;
+  grid-template-columns: 28px 4.5rem 1fr auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
   background: var(--card);
   font-size: 0.875rem;
+}
+
+.rows img {
+  border-radius: 50%;
+}
+
+/* Only reached when a stock has no logo at all — a resolved ticker whose
+   fetch failed. The curated eleven all ship one. */
+.logo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 0.625rem;
+  font-weight: 600;
 }
 
 .rows li + li {

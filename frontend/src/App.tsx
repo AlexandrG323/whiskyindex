@@ -96,6 +96,11 @@ export default function App() {
         <ul className="rows">
           {stocks.map((s) => (
             <li key={s.id}>
+              {s.imageUrl ? (
+                <img src={s.imageUrl} alt="" width={28} height={28} loading="lazy" />
+              ) : (
+                <span className="logo-placeholder">{s.symbol.slice(0, 2)}</span>
+              )}
               <span className="symbol">{s.symbol}</span>
               <span>{s.companyName}</span>
               <span className="price">

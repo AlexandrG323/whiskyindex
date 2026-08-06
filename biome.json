@@ -14,7 +14,8 @@
       "!**/coverage",
       "!**/package-lock.json",
       "!**/*.tsbuildinfo",
-      "!**/.vscode"
+      "!**/.vscode",
+      "!frontend/public"
     ]
   },
   "formatter": {

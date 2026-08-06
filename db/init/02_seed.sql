@@ -17,21 +17,25 @@ INSERT INTO stocks (
   id, symbol, company_name, country, exchange, source, image_url,
   native_currency, is_curated, is_active, import_status, prices_cached_at, image_cached_at
 ) VALUES
-  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  NULL, 'RUB', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', NULL, 'USD', true, true, 'pending', NULL, NULL)
+  ('11111111-1111-4111-8111-111111111001', 'GAZP',  'Газпром',        'RU', 'MOEX',   'moex',  '/icons/stocks/gazp.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111002', 'SBER',  'Сбербанк',       'RU', 'MOEX',   'moex',  '/icons/stocks/sber.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111003', 'LKOH',  'Лукойл',         'RU', 'MOEX',   'moex',  '/icons/stocks/lkoh.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111004', 'GMKN',  'Норникель',      'RU', 'MOEX',   'moex',  '/icons/stocks/gmkn.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111005', 'ROSN',  'Роснефть',       'RU', 'MOEX',   'moex',  '/icons/stocks/rosn.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111006', 'AVAZ',  'АвтоВАЗ',        'RU', 'MOEX',   'moex',  '/icons/stocks/avaz.svg',  'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111007', 'AAPL',  'Apple',          'US', 'NASDAQ', 'yahoo', '/icons/stocks/aapl.svg',  'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111008', 'GOOGL', 'Google',         'US', 'NASDAQ', 'yahoo', '/icons/stocks/googl.svg', 'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111009', 'MCD',   'McDonald''s',    'US', 'NYSE',   'yahoo', '/icons/stocks/mcd.svg',   'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111010', 'SPX',   'S&P 500',        'US', 'INDEX',  'yahoo', '/icons/stocks/spx.svg',   'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111011', 'PM',    'Philip Morris',  'US', 'NYSE',   'yahoo', '/icons/stocks/pm.svg',    'USD', true, true, 'pending', NULL, NULL)
 ON CONFLICT (symbol, exchange) DO UPDATE SET
   company_name = EXCLUDED.company_name,
   country = EXCLUDED.country,
   source = EXCLUDED.source,
+  -- Curated logos are bundled assets, so the seed is their source of truth and
+  -- re-seeding must refresh them. Only rows listed above are touched; a logo
+  -- fetched at resolve time for some other ticker is never overwritten.
+  image_url = EXCLUDED.image_url,
   native_currency = EXCLUDED.native_currency,
   is_curated = EXCLUDED.is_curated,
   is_active = EXCLUDED.is_active,
