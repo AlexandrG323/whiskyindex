@@ -10,6 +10,7 @@ import type {
   StockYearlyPriceDto,
 } from '../dto/common.dto'
 import { StockImportService } from '../import/stock-import.service'
+import { StockLogoService, type StoredLogo } from './stock-logo.service'
 
 /**
  * Stocks читают Postgres. Внешние API — только через StockImportService
@@ -25,7 +26,13 @@ export class StocksService {
   constructor(
     @Inject(PG_POOL) private readonly pool: Pool,
     private readonly stockImport: StockImportService,
+    private readonly stockLogo: StockLogoService,
   ) {}
+
+  /** Bytes for GET /v1/stocks/:id/logo. Null when the ticker has none stored. */
+  getLogo(stockId: string): Promise<StoredLogo | null> {
+    return this.stockLogo.getLogo(stockId)
+  }
 
   async getDefaultStocks(
     year = 2007,
@@ -533,6 +540,10 @@ export class StocksService {
 
       // Запускаем импорт для новой акции
       await this.stockImport.importStockById(newStock.id)
+
+      // Логотип: best-effort, не влияет на импорт цен. Сервис не бросает —
+      // акция без логотипа полностью работоспособна.
+      await this.stockLogo.fetchAndStore(newStock.id, symbol)
 
       // Запрашиваем обновленный статус
       const updated = await this.pool.query(

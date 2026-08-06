@@ -42,6 +42,20 @@ CREATE TABLE IF NOT EXISTS stock_data_coverage (
   PRIMARY KEY (stock_id, year)
 );
 
+-- Logos fetched at resolve time for tickers that are not part of the curated
+-- set. Curated logos are bundled files under frontend/public and are served by
+-- nginx directly; these cannot be, because the frontend image is built once and
+-- is read-only at runtime. Bytes live in Postgres rather than on the API
+-- container's filesystem so they survive a restart and are shared if the API is
+-- ever scaled out — pgdata is the only persistent volume in the compose file.
+CREATE TABLE IF NOT EXISTS stock_logos (
+  stock_id uuid PRIMARY KEY REFERENCES stocks (id) ON DELETE CASCADE,
+  content_type varchar(64) NOT NULL,
+  bytes bytea NOT NULL,
+  source varchar(32) NOT NULL,
+  fetched_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(255) NOT NULL,
