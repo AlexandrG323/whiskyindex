@@ -108,24 +108,30 @@ export class StockImportService {
   averageByYear(candles: MonthlyCandle[], currency: 'RUB' | 'USD'): YearlyAveragePrice[] {
     if (candles.length === 0) return []
 
-    const yearlyMap = new Map<number, number[]>()
+    const yearlyMap = new Map<number, { price: number[]; total: number[] }>()
 
     for (const candle of candles) {
       const year = new Date(candle.date).getUTCFullYear()
       if (!yearlyMap.has(year)) {
-        yearlyMap.set(year, [])
+        yearlyMap.set(year, { price: [], total: [] })
       }
-      yearlyMap.get(year)?.push(candle.close)
+      const bucket = yearlyMap.get(year)
+      bucket?.price.push(candle.close)
+      if (candle.adjClose !== undefined) {
+        bucket?.total.push(candle.adjClose)
+      }
     }
 
+    const mean = (xs: number[]) => Number((xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(6))
     const result: YearlyAveragePrice[] = []
 
-    for (const [year, prices] of yearlyMap.entries()) {
-      const sum = prices.reduce((acc, curr) => acc + curr, 0)
-      const averagePrice = Number((sum / prices.length).toFixed(6))
+    for (const [year, bucket] of yearlyMap.entries()) {
       result.push({
         year,
-        averagePrice,
+        averagePrice: mean(bucket.price),
+        // Only when every month of the year carried one, so a partially
+        // adjusted year never masquerades as a complete total-return figure.
+        totalReturnPrice: bucket.total.length === bucket.price.length ? mean(bucket.total) : null,
         currency,
       })
     }
@@ -158,14 +164,16 @@ export class StockImportService {
       for (const item of yearly) {
         await client.query(
           `
-          INSERT INTO stock_prices (stock_id, year, average_price, currency, imported_at)
-          VALUES ($1, $2, $3, $4, now())
+          INSERT INTO stock_prices
+            (stock_id, year, average_price, total_return_price, currency, imported_at)
+          VALUES ($1, $2, $3, $4, $5, now())
           ON CONFLICT (stock_id, year) DO UPDATE SET
             average_price = EXCLUDED.average_price,
+            total_return_price = EXCLUDED.total_return_price,
             currency = EXCLUDED.currency,
             imported_at = now()
           `,
-          [stockId, item.year, item.averagePrice, item.currency],
+          [stockId, item.year, item.averagePrice, item.totalReturnPrice, item.currency],
         )
 
         await client.query(

@@ -32,8 +32,6 @@ type Stock = {
 const MIN_YEAR = 1998
 const MAX_YEAR = 2026
 const DEFAULT_YEAR = 2007
-/** product_prices starts here; stocks reach back to MIN_YEAR. */
-const PRODUCT_DATA_FROM = 2007
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
 
 async function getJson<T>(url: string): Promise<T> {
@@ -182,14 +180,6 @@ export default function App() {
             </li>
           ))}
         </ul>
-        {!loading && year < PRODUCT_DATA_FROM && (
-          <p className="notice">
-            Цены до {PRODUCT_DATA_FROM} года — оценка: пересчёт от известной цены{' '}
-            {PRODUCT_DATA_FROM} года по инфляции Росстата с привязкой к найденным ценам 1998 года.
-            Точность ориентировочно ±50%, у импортных товаров ниже. Котировки акций за эти годы —
-            фактические.
-          </p>
-        )}
         {available.length > 0 && (
           <p className="total">
             Итого: <strong>{money(cartTotal, available[0].currency)}</strong>
@@ -202,11 +192,6 @@ export default function App() {
         <h2>
           Акции <span className="muted">({year})</span>
         </h2>
-        <p className="notice">
-          Акции США и S&amp;P 500 — с учётом реинвестирования дивидендов. Российские акции и Индекс
-          МосБиржи — только цена: у MOEX нет данных по дивидендам за весь период, поэтому их
-          доходность здесь занижена.
-        </p>
         <ul className="rows">
           {stocks.map((s) => (
             <li key={s.id}>

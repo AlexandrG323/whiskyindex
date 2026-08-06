@@ -28,7 +28,13 @@ CREATE TABLE IF NOT EXISTS stock_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   stock_id uuid NOT NULL REFERENCES stocks (id) ON DELETE CASCADE,
   year smallint NOT NULL CHECK (year BETWEEN 1990 AND 2100),
+  -- Split-adjusted share price: what one share cost. This is what gets shown.
   average_price numeric(18, 6) NOT NULL CHECK (average_price > 0),
+  -- Same year with dividends reinvested. Only meaningful as a ratio between
+  -- two years, never as a price — Exxon's 2007 share price was $83.83 against
+  -- a total-return value of $43.13. Kept for growth maths; null for MOEX,
+  -- which has no usable dividend history over this period.
+  total_return_price numeric(18, 6) CHECK (total_return_price > 0),
   currency char(3) NOT NULL,
   imported_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (stock_id, year)
@@ -70,6 +76,7 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS available_from smallint;
+ALTER TABLE stock_prices ADD COLUMN IF NOT EXISTS total_return_price numeric(18, 6);
 
 CREATE TABLE IF NOT EXISTS product_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

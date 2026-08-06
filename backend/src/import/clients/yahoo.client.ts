@@ -115,28 +115,22 @@ export class YahooClient {
 
     const timestamps = result.timestamp
     const quote = result.indicators.quote[0]
-    // adjclose is the total-return series: split-adjusted like quote.close, but
-    // also assuming dividends were reinvested. quote.close alone answers "what
-    // did one share cost", which is the wrong question for this app — holding
-    // Chevron from 1998 returns 14.4x with dividends and 5.1x without, so
-    // price-only understates it by 184%. Indices have no dividends, so their
-    // adjclose equals close and this changes nothing for SPX.
+    // Two series, deliberately kept apart. quote.close is the split-adjusted
+    // share price — what it actually cost, and what the UI shows. adjclose adds
+    // reinvested dividends and is only meaningful as a ratio between two dates:
+    // Exxon's 2007 price was $83.83, its total-return value $43.13. Displaying
+    // the latter as a price is wrong by half.
     const adjusted = result.indicators.adjclose?.[0]?.adjclose
     const candles: MonthlyCandle[] = []
 
     for (let i = 0; i < timestamps.length; i++) {
-      const rawClose = quote.close?.[i]
-      if (rawClose === null || rawClose === undefined) continue
+      const close = quote.close?.[i]
+      if (close === null || close === undefined) continue
 
       const adj = adjusted?.[i]
-      const close = adj === null || adj === undefined ? rawClose : adj
-      // Scale the rest by the same factor so the candle stays self-consistent.
-      // Only close feeds the yearly average today, but a half-adjusted candle
-      // is a trap for whoever reads these fields next.
-      const factor = rawClose === 0 ? 1 : close / rawClose
-      const open = (quote.open?.[i] ?? rawClose) * factor
-      const high = (quote.high?.[i] ?? rawClose) * factor
-      const low = (quote.low?.[i] ?? rawClose) * factor
+      const open = quote.open?.[i] ?? close
+      const high = quote.high?.[i] ?? close
+      const low = quote.low?.[i] ?? close
       const dateStr = new Date(timestamps[i] * 1000).toISOString().substring(0, 10)
 
       candles.push({
@@ -145,6 +139,7 @@ export class YahooClient {
         high: Number(high),
         low: Number(low),
         close: Number(close),
+        adjClose: adj === null || adj === undefined ? undefined : Number(adj),
       })
     }
 
