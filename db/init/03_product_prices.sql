@@ -291,7 +291,7 @@ VALUES
   ('22222222-2222-4222-8222-222222222013', 2024,  149.00, 'RUB'),
   ('22222222-2222-4222-8222-222222222013', 2025,  160.00, 'RUB'),
   ('22222222-2222-4222-8222-222222222013', 2026,  170.00, 'RUB'),
-  -- Пиво Жигулёвское 0.45 л
+  -- Жигулёвское 0.45 л
   -- Anchored to reported Rosstat averages for domestic beer (2015, 2017,
   -- 2020, 2025) scaled to the budget tier, with the 2026 bottle observed at
   -- retail. 2010 carries the excise tripling, 2018-2020 the excise freeze.
