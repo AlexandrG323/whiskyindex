@@ -19,9 +19,12 @@ export class ProductsService {
     type ProductRow = {
       id: string
       name: string
+      image_url: string | null
     }
-    const { rows } = await this.pool.query<ProductRow>(`SELECT id, name FROM products`)
-    return rows.map((row) => ({ id: row.id, name: row.name }))
+    const { rows } = await this.pool.query<ProductRow>(
+      `SELECT id, name, image_url FROM products ORDER BY name`,
+    )
+    return rows.map((row) => ({ id: row.id, name: row.name, imageUrl: row.image_url }))
   }
 
   async getCart(year = 2007, currency: 'rub' | 'usd' = 'rub'): Promise<ProductYearlyPriceDto[]> {

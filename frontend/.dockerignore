@@ -1,5 +1,8 @@
 node_modules
 dist
+# Full-resolution brand originals. The shipped .webp lives in public/icons/;
+# these are kept only for re-cropping and never need to enter the build.
+brand-src
 .env
 .env.*
 !.env.example

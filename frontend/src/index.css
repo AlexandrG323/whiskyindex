@@ -1,15 +1,136 @@
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  color-scheme: light dark;
+  color-scheme: dark;
+
+  --bg: #0b0b0d;
+  --card: #141417;
+  --border: #26262b;
+  --text: #f2f2f4;
+  --muted: #8a8a93;
+  --accent: #e9922e;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
 }
 
 #root {
   max-width: 960px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 2rem 0 0.75rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.masthead img {
+  border-radius: 12px;
+}
+
+.masthead p {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.error {
+  padding: 0.75rem 1rem;
+  border: 1px solid #5a2320;
+  border-radius: 8px;
+  background: #1d1210;
+  color: #f0503c;
+  font-size: 0.875rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.875rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: center;
+}
+
+.card .name {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.price {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  margin-top: 0.875rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.total strong {
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.rows {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rows li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--card);
+  font-size: 0.875rem;
+}
+
+.rows li + li {
+  border-top: 1px solid var(--border);
+}
+
+.symbol {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
 }

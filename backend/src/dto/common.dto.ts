@@ -61,6 +61,13 @@ export class ProductDto {
 
   @ApiProperty({ example: 'Виски Jameson 0.7' })
   name!: string
+
+  @ApiPropertyOptional({
+    example: '/icons/jameson.png',
+    nullable: true,
+    type: String,
+  })
+  imageUrl!: string | null
 }
 
 /** Элемент списка акций (SPEC → GET /api/v1/stocks) */

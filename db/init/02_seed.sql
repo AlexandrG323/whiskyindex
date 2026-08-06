@@ -43,20 +43,23 @@ ON CONFLICT (symbol, exchange) DO UPDATE SET
 -- ---------------------------------------------------------------------------
 -- Products (fixed UUIDs)
 -- ---------------------------------------------------------------------------
+-- image_url is a root-relative path, not an absolute URL: the SPA and the API
+-- are served from one origin in both dev (Vite) and prod (nginx), so these
+-- resolve as-is with no per-environment config. Files: frontend/public/icons/
 INSERT INTO products (id, name, category, image_url) VALUES
-  ('22222222-2222-4222-8222-222222222001', 'Виски Jameson 0.7',        'alcohol',   NULL),
-  ('22222222-2222-4222-8222-222222222002', 'Кола 2 литра',             'drinks',    NULL),
-  ('22222222-2222-4222-8222-222222222003', 'Сосиски',                  'meat',      NULL),
-  ('22222222-2222-4222-8222-222222222004', 'Пельмени',                 'frozen',    NULL),
-  ('22222222-2222-4222-8222-222222222005', 'Банка кофе Jacobs',        'grocery',   NULL),
-  ('22222222-2222-4222-8222-222222222006', 'Доширак',                  'grocery',   NULL),
-  ('22222222-2222-4222-8222-222222222007', 'Огурцы',                   'produce',   NULL),
-  ('22222222-2222-4222-8222-222222222008', 'Активированный уголь',     'pharmacy',  NULL),
-  ('22222222-2222-4222-8222-222222222009', 'Боржоми',                  'drinks',    NULL),
-  ('22222222-2222-4222-8222-222222222010', 'Картошка',                 'produce',   NULL),
-  ('22222222-2222-4222-8222-222222222011', 'Сигареты Winston',         'tobacco',   NULL),
-  ('22222222-2222-4222-8222-222222222012', 'Копчёная колбаса',         'meat',      NULL),
-  ('22222222-2222-4222-8222-222222222013', 'Майонез',                  'grocery',   NULL)
+  ('22222222-2222-4222-8222-222222222001', 'Виски Jameson 0.7',        'alcohol',   '/icons/jameson.png'),
+  ('22222222-2222-4222-8222-222222222002', 'Кола 2 литра',             'drinks',    '/icons/cola.png'),
+  ('22222222-2222-4222-8222-222222222003', 'Сосиски',                  'meat',      '/icons/sosiski.png'),
+  ('22222222-2222-4222-8222-222222222004', 'Пельмени',                 'frozen',    '/icons/pelmeni.png'),
+  ('22222222-2222-4222-8222-222222222005', 'Банка кофе Jacobs',        'grocery',   '/icons/jacobs.png'),
+  ('22222222-2222-4222-8222-222222222006', 'Доширак',                  'grocery',   '/icons/doshirak.png'),
+  ('22222222-2222-4222-8222-222222222007', 'Огурцы',                   'produce',   '/icons/ogurtsy.png'),
+  ('22222222-2222-4222-8222-222222222008', 'Активированный уголь',     'pharmacy',  '/icons/ugol.png'),
+  ('22222222-2222-4222-8222-222222222009', 'Боржоми',                  'drinks',    '/icons/borjomi.png'),
+  ('22222222-2222-4222-8222-222222222010', 'Картошка',                 'produce',   '/icons/kartoshka.png'),
+  ('22222222-2222-4222-8222-222222222011', 'Сигареты Winston',         'tobacco',   '/icons/winston.png'),
+  ('22222222-2222-4222-8222-222222222012', 'Копчёная колбаса',         'meat',      '/icons/kolbasa.png'),
+  ('22222222-2222-4222-8222-222222222013', 'Майонез',                  'grocery',   '/icons/mayonez.png')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   category = EXCLUDED.category,
