@@ -24,6 +24,13 @@ body {
   padding: 2rem;
 }
 
+/*
+ * TODO (домашка, см. frontend/HOMEWORK.md):
+ * layout с сайдбаром обычно ломает центрированный #root выше —
+ * сделай .app-layout (flex/grid): сайдбар фиксированной ширины + контент.
+ * Баннер в сайдбаре: img { width: 100%; display: block; }
+ */
+
 h1 {
   font-size: 1.5rem;
   margin: 0;

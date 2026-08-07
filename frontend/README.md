@@ -13,6 +13,11 @@ npm run dev
 Откроется на `http://localhost:5173`. Запросы к `/api/*` проксируются на backend
 (`http://localhost:3000`) — см. `vite.config.ts`.
 
+## Домашка
+
+См. [HOMEWORK.md](./HOMEWORK.md) — левая панель навигации + пустые страницы через React Router.
+Ориентир по UI: `mocks/mock1.png`, `mocks/mock2.png`.
+
 ## Дальше по плану
 
 - [ ] Выбор диапазона лет.
