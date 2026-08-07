@@ -32,7 +32,9 @@ INSERT INTO stocks (
   ('11111111-1111-4111-8111-111111111013', 'CVX',   'Chevron',        'US', 'NYSE',   'yahoo', '/icons/stocks/cvx.svg',   'USD', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111014', 'MSFT',  'Microsoft',      'US', 'NASDAQ', 'yahoo', '/icons/stocks/msft.svg',  'USD', true, true, 'pending', NULL, NULL),
   ('11111111-1111-4111-8111-111111111015', 'AMZN',  'Amazon',         'US', 'NASDAQ', 'yahoo', '/icons/stocks/amzn.svg',  'USD', true, true, 'pending', NULL, NULL),
-  ('11111111-1111-4111-8111-111111111016', 'IMOEX', 'Индекс МосБиржи','RU', 'INDEX',  'moex',  '/icons/stocks/imoex.svg', 'RUB', true, true, 'pending', NULL, NULL)
+  ('11111111-1111-4111-8111-111111111016', 'IMOEX', 'Индекс МосБиржи','RU', 'INDEX',  'moex',  '/icons/stocks/imoex.svg', 'RUB', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111017', 'NVDA',  'NVIDIA',         'US', 'NASDAQ', 'yahoo', '/icons/stocks/nvda.svg',  'USD', true, true, 'pending', NULL, NULL),
+  ('11111111-1111-4111-8111-111111111018', 'TSLA',  'Tesla',          'US', 'NASDAQ', 'yahoo', '/icons/stocks/tsla.svg',  'USD', true, true, 'pending', NULL, NULL)
 ON CONFLICT (symbol, exchange) DO UPDATE SET
   company_name = EXCLUDED.company_name,
   country = EXCLUDED.country,

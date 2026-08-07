@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type { Pool } from 'pg'
+import { MAX_YEAR, MIN_YEAR } from '../common/years'
 import { PG_POOL } from '../database/database.constants'
 import { MoexClient } from './clients/moex.client'
 import { YahooClient } from './clients/yahoo.client'
@@ -51,11 +52,7 @@ export class StockImportService {
    *
    * Не стартуй второй импорт, если статус уже `importing` (простая защита от гонок).
    */
-  async importStockById(
-    stockId: string,
-    fromYear = 2007,
-    toYear = new Date().getFullYear(),
-  ): Promise<void> {
+  async importStockById(stockId: string, fromYear = MIN_YEAR, toYear = MAX_YEAR): Promise<void> {
     const stock = await this.getStockOrThrow(stockId)
 
     if (stock.import_status === 'importing') {

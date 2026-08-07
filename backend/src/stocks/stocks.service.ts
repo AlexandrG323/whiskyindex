@@ -624,7 +624,11 @@ export class StocksService {
       const newStock = rows[0]
 
       // Запускаем импорт для новой акции
-      await this.stockImport.importStockById(newStock.id)
+      // Explicit range: a resolved stock must cover the same years as a
+      // curated one. Relying on the default left NVDA starting at 2007
+      // despite its 1999 IPO, and prices_cached_at then pinned that gap
+      // permanently because the list never re-imports a cached stock.
+      await this.stockImport.importStockById(newStock.id, MIN_YEAR, MAX_YEAR)
 
       // Логотип: best-effort, не влияет на импорт цен. Сервис не бросает —
       // акция без логотипа полностью работоспособна.
