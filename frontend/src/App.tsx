@@ -162,7 +162,7 @@ export default function App() {
 
       <section>
         <h2>
-          Корзина скуфа <span className="muted">({year})</span>
+          Корзина скуфа <span className="muted">{year}</span>
         </h2>
         <ul className="grid">
           {products.map((p) => (
@@ -190,7 +190,7 @@ export default function App() {
 
       <section>
         <h2>
-          Акции <span className="muted">({year})</span>
+          Акции <span className="muted">{year}</span>
         </h2>
         <ul className="rows">
           {stocks.map((s) => (
