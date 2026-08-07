@@ -11,21 +11,42 @@
 
 ---
 
-## Шаг 0 — запусти фронт (сделай первым делом!)
+## Шаг 0 — поставь `react-router-dom` (сделай первым делом!)
 
-Из **корня репозитория** (или из `frontend/` — как удобнее):
+Сейчас в `frontend/package.json` есть только `react` и `react-dom`.
+Для навигации без перезагрузки страницы нужен роутер — поставь его **до** первого
+`docker compose up`.
+
+`node_modules` живут **внутри Docker-образа** (папка `src` примонтирована, зависимости — нет).
+Пакет ставим на хосте, чтобы обновлённый `package.json` попал в git и в следующий build:
 
 ```bash
-# из корня
+# из корня репо
 cd frontend
-npm install
-npm run dev
+npm install react-router-dom
+cd ..
+```
+
+> Наводящий вопрос: чем `<a href="/about">` отличается от `<Link to="/about">`?
+> Что произойдёт с состоянием React (например, выбранный год), если сделать обычный `<a>`?
+
+---
+
+## Шаг 1 — подними всё через Docker
+
+Из **корня репозитория** (Postgres + API + frontend одной командой).
+Образ frontend при сборке сделает `npm install` уже **с** `react-router-dom`:
+
+```bash
+docker compose up --build
 ```
 
 Открой http://localhost:5173 — должна открыться нынешняя главная (корзина + акции).
+API и данные тоже уже внутри compose, так что на «Главной» цены должны грузиться.
 
-Backend для этой домашки **не обязателен**: пустые страницы работают и без API.
-Если хочешь видеть данные на «Главной» — подними API как обычно (`docker compose up` / `npm run start:dev` в backend).
+Исходники `frontend/src` и `frontend/public` примонтированы в контейнер — правки в
+`.tsx` / `.css` подхватываются без пересборки образа.
+Rebuild нужен только если снова меняешь зависимости в `package.json`.
 
 Картинка для сайдбара уже лежит здесь:
 
@@ -54,20 +75,7 @@ frontend/public/icons/banner.webp
 
 ## Что реализовать (чеклист)
 
-### 1. Поставить `react-router-dom`
-
-Сейчас в `frontend/package.json` есть только `react` и `react-dom`.
-Для навигации без перезагрузки страницы нужен роутер:
-
-```bash
-cd frontend
-npm install react-router-dom
-```
-
-> Наводящий вопрос: чем `<a href="/about">` отличается от `<Link to="/about">`?
-> Что произойдёт с состоянием React (например, выбранный год), если сделать обычный `<a>`?
-
-### 2. Сделать layout: сайдбар + header + «дырка» под страницу
+### 1. Сделать layout: сайдбар + header + «дырка» под страницу
 
 Идея layout’а (как в моках):
 
@@ -89,7 +97,7 @@ npm install react-router-dom
 > Наводящий вопрос: почему header и сайдбар лучше держать в layout, а не копировать
 > в каждый файл страницы? Что будет, если скопировать?
 
-### 3. Левая панель (`Sidebar`)
+### 2. Левая панель (`Sidebar`)
 
 Заготовка: `src/components/Sidebar.tsx`.
 
@@ -118,7 +126,7 @@ npm install react-router-dom
 > Наводящий вопрос: куда логичнее поставить баннер — над меню или под ним?
 > Посмотри моки и выбери один вариант, коротко напиши в PR почему.
 
-### 4. Страницы
+### 3. Страницы
 
 Заготовки в `src/pages/`:
 
@@ -142,7 +150,7 @@ npm install react-router-dom
 > если им будут пользоваться несколько страниц — в layout, в URL (`?year=2007`)
 > или в отдельном state/context? (ответ писать не обязательно, просто подумай)
 
-### 5. Собрать маршруты в `App.tsx` / `main.tsx`
+### 4. Собрать маршруты в `App.tsx` / `main.tsx`
 
 Типичная схема:
 
@@ -164,7 +172,7 @@ npm install react-router-dom
 > Наводящий вопрос: что такое nested route и зачем `element={<AppLayout />}`
 > без `path` у родительского `Route`?
 
-### 6. CSS под новый layout
+### 5. CSS под новый layout
 
 В `index.css` сейчас `#root { max-width: 1240px; margin: 0 auto; … }` —
 это центрирует одну колонку. С сайдбаром на всю высоту экрана удобнее:
@@ -194,7 +202,7 @@ npm install react-router-dom
 | Белый экран / ошибка `useNavigate() may be…` | нет `BrowserRouter` выше | оберни дерево в `BrowserRouter` |
 | Клик по ссылке перезагружает всю страницу | обычный `<a href>` | используй `<Link>` / `<NavLink>` |
 | Header пропадает на `/about` | header лежит внутри `HomePage` | вынеси в `AppLayout` |
-| Обновил `/about` — 404 от nginx/Vite | для dev обычно ок; в Docker/nginx нужен fallback на `index.html` | для локального `npm run dev` не чини; если сломалось в compose — скажи в PR |
+| Обновил `/about` — 404 | в **dev** (Vite в compose) обычно ок; в production-nginx нужен fallback на `index.html` | если в `docker compose` на `/about` + F5 сломалось — напиши в PR |
 | Баннер огромный / обрезан | нет `width: 100%` / object-fit | смотри CSS у `img` в сайдбаре |
 | Главная пустая, данных нет | перенёс JSX, забыл `useEffect` / state | сверь с старым `App.tsx` через git |
 
@@ -203,8 +211,8 @@ npm install react-router-dom
 ## Сценарии тестирования
 
 ```bash
-cd frontend
-npm run dev
+# из корня репо — если ещё не поднято
+docker compose up --build
 ```
 
 ### Сценарий A — сайдбар на месте
@@ -230,7 +238,7 @@ npm run dev
 
 ### Сценарий D — главная не сломалась
 
-1. На «Главной» по-прежнему грузятся продукты и акции (если backend запущен)
+1. На «Главной» по-прежнему грузятся продукты и акции (API уже в compose)
 2. Смена года в header обновляет данные как раньше
 
 ---
@@ -239,14 +247,14 @@ npm run dev
 
 Рекомендуемый порядок (не обязательно строго):
 
-1. `npm install react-router-dom`
+1. Шаг 0: `react-router-dom`, затем Шаг 1: `docker compose up --build`
 2. Допиши пустые страницы в `src/pages/*` (просто `<h2>…</h2>`)
 3. Собери `Sidebar` с `Link`/`NavLink` + баннер
 4. Собери `AppLayout` (Sidebar + masthead + `<Outlet />`)
 5. Перенеси контент главной из `App.tsx` → `HomePage.tsx`
 6. Подключи `Routes` в `App.tsx`, `BrowserRouter` в `main.tsx`
 7. Поправь CSS
-8. `npm run typecheck` и `npm run lint` (или из корня `npm run check`)
+8. Из корня: `npm run check` (lint + typecheck; можно на хосте, если стоят зависимости)
 
 ---
 
