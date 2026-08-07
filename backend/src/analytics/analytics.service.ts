@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Pool } from 'pg'
+import { PG_POOL } from '../database/database.constants'
 import {
   CartPriceRangeDto,
   CompareCartAndStocksDto,
@@ -22,6 +24,7 @@ export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name)
 
   constructor(
+    @Inject(PG_POOL) private readonly pool: Pool,
     private readonly products: ProductsService,
     private readonly stocks: StocksService,
   ) {}
@@ -198,6 +201,25 @@ export class AnalyticsService {
       priceTo: this.roundMoney(endpoints.priceTo),
       growthPercent: this.growthPercent(endpoints.priceFrom, endpoints.priceTo),
     }
+  }
+
+  async exchangeRateByYear(year: number): Promise<number> {
+    const { rows } = await this.pool.query<{ rate: string }>(
+      `
+      SELECT rate
+      FROM exchange_rates
+      WHERE year = $1
+        AND base_currency = 'USD'
+        AND quote_currency = 'RUB'
+    `,
+      [year],
+    )
+
+    if (rows.length === 0) {
+      throw new NotFoundException(`Exchange rate for ${year} was not found`)
+    }
+
+    return Number(rows[0].rate)
   }
 
   private purchasingPower(

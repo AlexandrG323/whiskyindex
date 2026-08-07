@@ -78,4 +78,15 @@ export class AnalyticsController {
       .map((value) => value.trim())
       .filter((value) => value.length > 0)
   }
+
+  @Get('exchange-rate')
+  @ApiQuery({ name: 'year', required: false, type: Number, example: 2007 })
+  @ApiOkResponse({ type: Number })
+  exchangeRateByYear(@Query('year') year?: string): Promise<number> {
+    const parsedYear = Number(year)
+
+    const targetYear = Number.isNaN(parsedYear) ? 2007 : parsedYear
+
+    return this.analyticsService.exchangeRateByYear(targetYear)
+  }
 }
