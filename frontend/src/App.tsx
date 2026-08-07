@@ -89,6 +89,7 @@ export default function App() {
   const [year, setYear] = useState(DEFAULT_YEAR)
   const [products, setProducts] = useState<CartProduct[]>([])
   const [stocks, setStocks] = useState<Stock[]>([])
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   // A cold year blocks server-side while prices import from MOEX/Yahoo, which
   // can take seconds. Without this the page just sat empty and looked broken.
@@ -101,8 +102,9 @@ export default function App() {
     Promise.all([
       getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}`),
       getJson<Stock[]>(`/api/v1/stocks?year=${year}`),
+      getJson<number>(`/api/v1/analytics/exchange-rate?year=${year}`),
     ])
-      .then(([cart, listed]) => {
+      .then(([cart, listed, rate]) => {
         // A slow year's response must not overwrite a newer selection.
         if (cancelled) return
         setProducts(cart)
@@ -114,6 +116,7 @@ export default function App() {
             return rank(a) - rank(b) || a.symbol.localeCompare(b.symbol)
           }),
         )
+        setExchangeRate(rate)
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
@@ -149,6 +152,7 @@ export default function App() {
             ))}
           </select>
         </label>
+        {exchangeRate && <p className="muted">Курс $: {exchangeRate}</p>}
       </header>
 
       {error && <p className="error">Не удалось загрузить данные: {error}</p>}
