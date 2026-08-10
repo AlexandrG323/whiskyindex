@@ -1,10 +1,14 @@
-/**
- * TODO (домашка): перенеси сюда контент главной из App.tsx
- * (секции «Корзина скуфа» и «Акции», fetch, loading, error).
- * Header (.masthead) сюда НЕ переносить — он остаётся в AppLayout.
- *
- * См. frontend/HOMEWORK.md.
- */
-export function HomePage() {
-  return <h2>Главная — заготовка</h2>
+interface HomePageProps {
+  year: number
+}
+
+export function HomePage({ year }: HomePageProps) {
+  return (
+    <div>
+      <h2>Главная страница</h2>
+      <p className="muted">
+        Добро пожаловать в Whisky Index ({year} год)! Выберите нужный раздел в меню слева.
+      </p>
+    </div>
+  )
 }

@@ -7,11 +7,24 @@
  * - справа сверху существующий header (.masthead из App.tsx)
  * - справа ниже — <Outlet /> из react-router-dom (сюда рендерятся страницы)
  */
-export function AppLayout() {
+import type { ReactNode } from 'react'
+import { Outlet } from 'react-router-dom'
+import { Sidebar } from '../components/Sidebar'
+
+interface AppLayoutProps {
+  header: ReactNode
+}
+
+export function AppLayout({ header }: AppLayoutProps) {
   return (
     <div className="app-layout">
-      {/* TODO: Sidebar + masthead + Outlet */}
-      <p className="muted">AppLayout — заготовка</p>
+      <Sidebar />
+      <div className="app-content">
+        {header}
+        <main className="page-body">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
