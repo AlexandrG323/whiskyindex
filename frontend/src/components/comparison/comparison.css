@@ -1,0 +1,46 @@
+.hero-comparison {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.comparison-card {
+  flex: 1;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 32px;
+
+  border-radius: 24px;
+
+  background: #1b1d21;
+}
+
+.price-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.comparison-badge {
+  width: 90px;
+  height: 90px;
+
+  border-radius: 50%;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  font-size: 34px;
+  font-weight: 700;
+
+  background: #ffb23d;
+  color: black;
+}
+
+.growth {
+  color: #57d163;
+}
