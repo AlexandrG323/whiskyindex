@@ -1,31 +1,66 @@
+import './comparison.css'
 import { BasketCard } from './BasketCard'
 import { ComparisonBadge } from './ComparisonBadge'
+import { stockInvestmentRange, stockLogoUrl } from './comparisonUtils'
 import { StockCard } from './StockCard'
 
-interface HeroComparisonProps {
-  year: number
+export type CompareStock = {
+  id: string
+  symbol: string
+  companyName: string
+  imageUrl: string | null
+  priceFromYear: number
+  priceToYear: number
+  priceFrom: number
+  priceTo: number
+  growthPercent: number
+  atFrom: { sharesPerCart: number }
 }
 
-export function HeroComparison({ year }: HeroComparisonProps) {
+interface HeroComparisonProps {
+  fromYear: number
+  currency: 'RUB' | 'USD'
+  cartFrom: number
+  cartTo: number
+  cartGrowthPercent: number
+  stock: CompareStock
+  historyPrices: { year: number; amount: number }[]
+}
+
+export function HeroComparison({
+  fromYear,
+  currency,
+  cartFrom,
+  cartTo,
+  cartGrowthPercent,
+  stock,
+  historyPrices,
+}: HeroComparisonProps) {
+  const investment = stockInvestmentRange(stock)
+
   return (
     <section className="hero-comparison">
       <BasketCard
         image="/icons/cart.png"
-        year={year}
-        startPrice={3450}
-        currentPrice={72620}
-        growthPercent={2103}
+        year={fromYear}
+        startPrice={cartFrom}
+        currentPrice={cartTo}
+        growthPercent={cartGrowthPercent}
+        currency={currency}
       />
 
       <ComparisonBadge />
 
       <StockCard
-        companyName="Apple"
-        imageUrl="https://logo.clearbit.com/apple.com"
-        year={year}
-        startPrice={3450}
-        currentPrice={149182}
-        growthPercent={2547}
+        companyName={stock.companyName}
+        imageUrl={stockLogoUrl(stock)}
+        fromYear={stock.priceFromYear}
+        toYear={stock.priceToYear}
+        startPrice={investment.from}
+        currentPrice={investment.to}
+        growthPercent={stock.growthPercent}
+        historyPrices={historyPrices}
+        currency={currency}
       />
     </section>
   )

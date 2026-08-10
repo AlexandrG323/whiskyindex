@@ -63,7 +63,7 @@ export default function App() {
   return (
     <Routes>
       <Route element={<AppLayout header={header} />}>
-        <Route path="/" element={<HomePage year={year} />} />
+        <Route path="/" element={<HomePage year={year} toYear={MAX_YEAR} />} />
         <Route path="/cart" element={<CartPage year={year} />} />
         <Route path="/stocks" element={<StocksPage year={year} />} />
         <Route path="/compare" element={<ComparePage />} />

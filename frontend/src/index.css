@@ -320,3 +320,8 @@ h2 {
 .page-body {
   margin-top: 1rem;
 }
+
+.page-body > main,
+.page-body > div {
+  display: block;
+}

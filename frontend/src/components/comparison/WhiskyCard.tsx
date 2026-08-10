@@ -1,7 +1,7 @@
 import { PriceInfo } from './PriceInfo'
 
-interface BasketCardProps {
-  image: string
+interface WhiskyCardProps {
+  name: string
   year: number
   startPrice: number
   currentPrice: number
@@ -9,17 +9,17 @@ interface BasketCardProps {
   currency?: 'RUB' | 'USD'
 }
 
-export function BasketCard({
-  image,
+export function WhiskyCard({
+  name,
   year,
   startPrice,
   currentPrice,
   growthPercent,
   currency = 'RUB',
-}: BasketCardProps) {
+}: WhiskyCardProps) {
   return (
     <article className="comparison-card">
-      <h2>Корзина скуфа</h2>
+      <h2>{name}</h2>
 
       <div className="comparison-card-body">
         <PriceInfo
@@ -30,7 +30,7 @@ export function BasketCard({
           currency={currency}
         />
 
-        <img src={image} alt="Корзина скуфа" className="basket-image" />
+        <img src="/icons/jameson.png" alt={name} className="product-image" />
       </div>
     </article>
   )

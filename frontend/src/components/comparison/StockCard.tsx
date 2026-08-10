@@ -1,36 +1,50 @@
 import { PriceInfo } from './PriceInfo'
+import { StockTrendChart } from './StockTrendChart'
 
 interface StockCardProps {
   companyName: string
+  heading?: string
   imageUrl: string
-  year: number
+  fromYear: number
+  toYear: number
   startPrice: number
   currentPrice: number
   growthPercent: number
+  historyPrices: { year: number; amount: number }[]
+  currency?: 'RUB' | 'USD'
 }
 
 export function StockCard({
   companyName,
+  heading,
   imageUrl,
-  year,
+  fromYear,
+  toYear,
   startPrice,
   currentPrice,
   growthPercent,
+  historyPrices,
+  currency = 'RUB',
 }: StockCardProps) {
   return (
     <article className="comparison-card">
       <header className="stock-header">
-        <h2>{companyName}</h2>
-
+        <h2>{heading ?? `Портфель: ${companyName}`}</h2>
         <img src={imageUrl} alt={companyName} className="company-logo" />
       </header>
 
-      <PriceInfo
-        year={year}
-        startPrice={startPrice}
-        currentPrice={currentPrice}
-        growthPercent={growthPercent}
-      />
+      <div className="comparison-card-body">
+        <PriceInfo
+          year={fromYear}
+          startPrice={startPrice}
+          currentPrice={currentPrice}
+          growthPercent={growthPercent}
+          variant="investment"
+          currency={currency}
+        />
+
+        <StockTrendChart prices={historyPrices} fromYear={fromYear} toYear={toYear} />
+      </div>
     </article>
   )
 }
