@@ -1,3 +1,8 @@
+/**
+ * Домашка (выходные): левая навигация + страницы.
+ * Читай frontend/HOMEWORK.md — заготовки в components/, layout/, pages/.
+ * Пока этот файл целиком = «главная»; цель — разнести на AppLayout + HomePage + Routes.
+ */
 import { useEffect, useState } from 'react'
 
 /** Matches ProductYearlyPriceDto — GET /api/v1/products/cart */
