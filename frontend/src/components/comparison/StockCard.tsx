@@ -29,7 +29,7 @@ export function StockCard({
   return (
     <article className="comparison-card">
       <header className="stock-header">
-        <h2>{heading ?? `Портфель: ${companyName}`}</h2>
+        <h2>{heading ?? `Лучший рост: ${companyName}`}</h2>
         <img src={imageUrl} alt={companyName} className="company-logo" />
       </header>
 

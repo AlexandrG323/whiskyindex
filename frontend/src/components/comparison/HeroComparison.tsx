@@ -1,6 +1,5 @@
 import './comparison.css'
 import { BasketCard } from './BasketCard'
-import { ComparisonBadge } from './ComparisonBadge'
 import { stockInvestmentRange, stockLogoUrl } from './comparisonUtils'
 import { StockCard } from './StockCard'
 
@@ -39,7 +38,7 @@ export function HeroComparison({
   const investment = stockInvestmentRange(stock)
 
   return (
-    <section className="hero-comparison">
+    <section className="comparison-row" aria-label="Корзина и лучшая акция">
       <BasketCard
         image="/icons/cart.png"
         year={fromYear}
@@ -48,8 +47,6 @@ export function HeroComparison({
         growthPercent={cartGrowthPercent}
         currency={currency}
       />
-
-      <ComparisonBadge />
 
       <StockCard
         companyName={stock.companyName}

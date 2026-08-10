@@ -125,25 +125,27 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
       )}
 
       {compare && heroStock && (
-        <HeroComparison
-          fromYear={compare.from}
-          currency={compare.currency}
-          cartFrom={compare.cart.priceFrom}
-          cartTo={compare.cart.priceTo}
-          cartGrowthPercent={compare.cart.growthPercent}
-          stock={heroStock}
-          historyPrices={historyPrices}
-        />
-      )}
+        <div className="comparison-stack">
+          <HeroComparison
+            fromYear={compare.from}
+            currency={compare.currency}
+            cartFrom={compare.cart.priceFrom}
+            cartTo={compare.cart.priceTo}
+            cartGrowthPercent={compare.cart.growthPercent}
+            stock={heroStock}
+            historyPrices={historyPrices}
+          />
 
-      {compare && worstStock && (
-        <SecondaryComparison
-          fromYear={compare.from}
-          currency={compare.currency}
-          jameson={compare.jameson}
-          worstStock={worstStock}
-          worstHistoryPrices={worstHistoryPrices}
-        />
+          {worstStock && (
+            <SecondaryComparison
+              fromYear={compare.from}
+              currency={compare.currency}
+              jameson={compare.jameson}
+              worstStock={worstStock}
+              worstHistoryPrices={worstHistoryPrices}
+            />
+          )}
+        </div>
       )}
     </div>
   )

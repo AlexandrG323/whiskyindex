@@ -29,10 +29,7 @@ export function SecondaryComparison({
   const investment = stockInvestmentRange(worstStock)
 
   return (
-    <section
-      className="comparison-row comparison-row--secondary"
-      aria-label="Виски и худший рост акций"
-    >
+    <section className="comparison-row" aria-label="Виски и худший рост акций">
       <WhiskyCard
         name={jameson.name}
         year={fromYear}
