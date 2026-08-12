@@ -62,7 +62,7 @@ export default function App() {
               ))}
             </select>
           </label>
-          {exchangeRate && <p className="muted">Курс $: {exchangeRate}</p>}
+          {exchangeRate && <p className="muted">$1 = {exchangeRate}₽</p>}
         </>
       )}
     </header>
