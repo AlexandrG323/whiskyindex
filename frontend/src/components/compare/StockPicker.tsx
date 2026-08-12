@@ -1,17 +1,40 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { stockLogoUrl } from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
+import { IconMenu } from '../ui/IconMenu'
+import { AddIcon, ResetIcon, SelectAllIcon, SortIcon } from '../ui/icons'
+
+export type StockSort = 'alpha' | 'growth'
+
+const SORT_OPTIONS: { value: StockSort; label: string }[] = [
+  { value: 'alpha', label: 'По алфавиту' },
+  { value: 'growth', label: 'По росту' },
+]
 
 interface StockPickerProps {
   stocks: CompareStock[]
   selectedIds: Set<string>
   onToggle: (id: string) => void
+  /** Clears the selection, or restores all of it when nothing is selected. */
   onReset: () => void
+  /** Opens the add-custom-stock dialog. Disabled until wired up. */
+  onAdd?: () => void
 }
 
-export function StockPicker({ stocks, selectedIds, onToggle, onReset }: StockPickerProps) {
+export function StockPicker({ stocks, selectedIds, onToggle, onReset, onAdd }: StockPickerProps) {
   const listRef = useRef<HTMLUListElement>(null)
   const [thumb, setThumb] = useState({ top: 0, height: 40 })
+  const [sort, setSort] = useState<StockSort>('alpha')
+
+  const noneSelected = selectedIds.size === 0
+
+  const sortedStocks = useMemo(() => {
+    const copy = [...stocks]
+    if (sort === 'growth') {
+      return copy.sort((a, b) => b.growthPercent - a.growthPercent)
+    }
+    return copy.sort((a, b) => a.companyName.localeCompare(b.companyName, 'ru'))
+  }, [stocks, sort])
 
   const updateThumb = useCallback(() => {
     const el = listRef.current
@@ -80,7 +103,7 @@ export function StockPicker({ stocks, selectedIds, onToggle, onReset }: StockPic
 
       <div className="stock-picker-scroll">
         <ul ref={listRef} className="stock-picker" onScroll={updateThumb}>
-          {stocks.map((stock) => {
+          {sortedStocks.map((stock) => {
             const checked = selectedIds.has(stock.id)
             const logo = stockLogoUrl(stock)
             return (
@@ -108,9 +131,39 @@ export function StockPicker({ stocks, selectedIds, onToggle, onReset }: StockPic
         </div>
       </div>
 
-      <button type="button" className="stock-picker-reset" onClick={onReset}>
-        Сбросить все
-      </button>
+      {/* Below the list rather than in the title row — three buttons there
+          squeezed the heading onto two lines. */}
+      <div className="picker-tools">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onReset}
+          aria-label={noneSelected ? 'Выбрать все' : 'Сбросить все'}
+          title={noneSelected ? 'Выбрать все' : 'Сбросить все'}
+        >
+          {noneSelected ? <SelectAllIcon /> : <ResetIcon />}
+        </button>
+
+        <IconMenu
+          icon={<SortIcon />}
+          ariaLabel="Сортировка"
+          value={sort}
+          options={SORT_OPTIONS}
+          onChange={setSort}
+          align="start"
+        />
+
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onAdd}
+          disabled={!onAdd}
+          aria-label="Добавить свою акцию"
+          title={onAdd ? 'Добавить свою акцию' : 'Добавить свою акцию — скоро'}
+        >
+          <AddIcon />
+        </button>
+      </div>
     </aside>
   )
 }

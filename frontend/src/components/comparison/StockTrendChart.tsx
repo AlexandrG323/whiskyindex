@@ -52,6 +52,7 @@ export function StockTrendChart({ prices, fromYear, toYear }: StockTrendChartPro
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
         />
       </svg>
       <figcaption className="stock-trend-chart__years">

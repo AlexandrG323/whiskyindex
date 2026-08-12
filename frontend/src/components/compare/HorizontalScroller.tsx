@@ -52,8 +52,19 @@ export function HorizontalScroller({
     el.scrollBy({ left: dir * amount, behavior: 'smooth' })
   }
 
+  // Fades mirror the arrows: shown only on the side that still has content,
+  // so a fully-scrolled (or unscrollable) list has no stray shadow.
+  const fade =
+    canScrollLeft && canScrollRight
+      ? ' h-scroller--fade-both'
+      : canScrollLeft
+        ? ' h-scroller--fade-left'
+        : canScrollRight
+          ? ' h-scroller--fade-right'
+          : ''
+
   return (
-    <div className={`h-scroller${className ? ` ${className}` : ''}`}>
+    <div className={`h-scroller${className ? ` ${className}` : ''}${fade}`}>
       <button
         type="button"
         className="h-scroller-btn h-scroller-btn--left"

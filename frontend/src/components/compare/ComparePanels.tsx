@@ -113,17 +113,26 @@ interface EquivalentsPanelProps {
   }[]
 }
 
+/**
+ * Activated charcoal is a gag item in the basket — as an "what could you buy"
+ * equivalent it says nothing and crowds out things worth picturing.
+ */
+const EQUIVALENT_EXCLUDED = /уголь/i
+
+/** The column is as tall as the chart beside it, so it fits far more than 5. */
+const EQUIVALENT_LIMIT = 12
+
 export function EquivalentsPanel({ stock, products }: EquivalentsPanelProps) {
   const investment = stockInvestmentRange(stock)
   const items = products
-    .filter((p) => p.price !== null && p.price > 0)
+    .filter((p) => p.price !== null && p.price > 0 && !EQUIVALENT_EXCLUDED.test(p.name))
     .map((p) => ({
       id: p.id,
       name: p.name,
       count: Math.floor(investment.to / (p.price as number)),
     }))
     .filter((p) => p.count > 0)
-    .slice(0, 5)
+    .slice(0, EQUIVALENT_LIMIT)
 
   return (
     <aside className="compare-panel" aria-label="На что хватило бы">
@@ -143,7 +152,7 @@ export function EquivalentsPanel({ stock, products }: EquivalentsPanelProps) {
         </ul>
       )}
       <p className="muted" style={{ margin: 'auto 0 0', fontSize: '0.75rem' }}>
-        Если вложить стоимость корзины в {stock.companyName}
+        Если бы вложили стоимость корзины в {stock.companyName}
       </p>
     </aside>
   )

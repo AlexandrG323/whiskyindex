@@ -1,5 +1,6 @@
-/** TODO (домашка): пока достаточно заголовка «Корзина скуфа». */
 import { useEffect, useState } from 'react'
+import { Loader } from '../components/ui/Loader'
+import { getJson } from '../lib/api'
 
 type CartProduct = {
   id: string
@@ -9,14 +10,6 @@ type CartProduct = {
   priceStatus: 'actual' | 'not_yet' | 'unavailable'
   availableFrom: number | null
   currency: 'RUB' | 'USD'
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
 }
 
 function money(amount: number, currency: 'RUB' | 'USD') {
@@ -65,12 +58,7 @@ export function CartPage({ year }: CartPageProps) {
     <div className={loading ? 'is-loading' : undefined}>
       {error && <p className="error">Не удалось загрузить данные: {error}</p>}
 
-      {loading && products.length === 0 && (
-        <p className="loading">
-          <span className="spinner" aria-hidden="true" />
-          Загружаем корзину за {year}…
-        </p>
-      )}
+      {loading && products.length === 0 && <Loader>Загружаем корзину за {year}…</Loader>}
 
       <section>
         <h2>

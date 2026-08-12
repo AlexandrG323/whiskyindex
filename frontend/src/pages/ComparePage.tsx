@@ -8,6 +8,9 @@ import { GrowthChart } from '../components/compare/GrowthChart'
 import { HorizontalScroller } from '../components/compare/HorizontalScroller'
 import { StockPicker } from '../components/compare/StockPicker'
 import type { CompareStock } from '../components/comparison/HeroComparison'
+import { Loader } from '../components/ui/Loader'
+import { Select } from '../components/ui/Select'
+import { getJson, postJson } from '../lib/api'
 import '../components/compare/compare.css'
 import '../components/comparison/comparison.css'
 
@@ -16,6 +19,14 @@ const MAX_YEAR = 2026
 const DEFAULT_FROM = 2007
 const DEFAULT_TO = 2026
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
+
+/** One-tap spans people actually reach for, all running to the present. */
+const PERIOD_PRESETS = [
+  { label: 'С 1998', from: 1998 },
+  { label: 'С Крыма', from: 2014 },
+  { label: 'СВО', from: 2022 },
+  { label: 'За год', from: MAX_YEAR - 1 },
+]
 
 type CompareResponse = {
   from: number
@@ -44,6 +55,15 @@ type StockHistoryResponse = {
   prices: { year: number; amount: number }[]
 }
 
+/** 1 год / 2 года / 5 лет — Russian needs three forms, not two. */
+function yearsLabel(count: number) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return `${count} год`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} года`
+  return `${count} лет`
+}
+
 function formatGrowth(value: number) {
   const rounded = Math.round(value)
   const sign = rounded >= 0 ? '+' : ''
@@ -68,26 +88,6 @@ function mergeCartProducts(fromCart: CartProduct[], toCart: CartProduct[]): Cart
       growthPercent: productGrowthPercent(priceFrom, priceTo),
     }
   })
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
-}
-
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
 }
 
 function money(amount: number, currency: 'RUB' | 'USD') {
@@ -121,6 +121,13 @@ export function ComparePage() {
   const setToYear = (year: number) => {
     setTo(year)
     if (year <= from) setFrom(Math.max(MIN_YEAR, year - 1))
+  }
+
+  // Presets set both ends at once, so they bypass the clamping the individual
+  // setters do for each other.
+  const applyPreset = (fromYear: number) => {
+    setFrom(fromYear)
+    setTo(MAX_YEAR)
   }
 
   useEffect(() => {
@@ -205,6 +212,15 @@ export function ComparePage() {
 
   const bestStock = useMemo(() => pickTopGrowthStock(selectedStocks), [selectedStocks])
 
+  const fromOptions = useMemo(
+    () => YEARS.map((y) => ({ value: y, label: String(y), disabled: y >= to })),
+    [to],
+  )
+  const toOptions = useMemo(
+    () => YEARS.map((y) => ({ value: y, label: String(y), disabled: y <= from })),
+    [from],
+  )
+
   const chartHistories = useMemo(
     () =>
       histories.map((h) => ({
@@ -225,59 +241,80 @@ export function ComparePage() {
     })
   }
 
-  const resetSelection = () => setSelectedIds(new Set())
+  // Doubles as "select all": once the list is empty the button's only useful
+  // job is putting everything back.
+  const resetSelection = () => {
+    setSelectedIds((prev) =>
+      prev.size > 0 ? new Set() : new Set(compare?.stocks.map((s) => s.id) ?? []),
+    )
+  }
 
   return (
     <div className={`compare-page${loading ? ' is-loading' : ''}`}>
-      <header className="compare-intro">
+      <header className="page-intro">
         <h2>Что было выгоднее?</h2>
-        <p>Сравните стоимость корзины скуфа с ростом акций за выбранный период.</p>
+        <p className="page-intro-lead">
+          Выберите период и бумаги — увидите, как они росли против корзины скуфа и на что хватило бы
+          вложений сегодня.
+        </p>
       </header>
 
       <div className="compare-period">
         <span className="compare-period-label">Выберите период</span>
+
         <div className="compare-period-controls">
           <div className="compare-year-block">
-            <label className="compare-year-field">
-              От
-              <select value={from} onChange={(e) => setFromYear(Number(e.target.value))}>
-                {YEARS.map((y) => (
-                  <option key={y} value={y} disabled={y >= to}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              value={from}
+              options={fromOptions}
+              onChange={setFromYear}
+              ariaLabel="Год начала периода"
+            />
             <p className="compare-year-rate">
               {fromRate !== null ? `$1 = ${fromRate}₽` : '$1 = —'}
             </p>
           </div>
+
           <span className="compare-period-arrow" aria-hidden="true">
             →
           </span>
+
           <div className="compare-year-block">
-            <label className="compare-year-field">
-              До
-              <select value={to} onChange={(e) => setToYear(Number(e.target.value))}>
-                {YEARS.map((y) => (
-                  <option key={y} value={y} disabled={y <= from}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              value={to}
+              options={toOptions}
+              onChange={setToYear}
+              ariaLabel="Год окончания периода"
+            />
             <p className="compare-year-rate">{toRate !== null ? `$1 = ${toRate}₽` : '$1 = —'}</p>
           </div>
+        </div>
+
+        <p className="compare-period-span">{yearsLabel(to - from)}</p>
+
+        <div className="compare-presets">
+          {PERIOD_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              className={`compare-preset${
+                from === preset.from && to === MAX_YEAR ? ' is-active' : ''
+              }`}
+              onClick={() => applyPreset(preset.from)}
+              title={`${preset.from}–${MAX_YEAR}`}
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {error && <p className="error">Не удалось загрузить сравнение: {error}</p>}
 
       {loading && !compare && (
-        <p className="loading">
-          <span className="spinner" aria-hidden="true" />
+        <Loader>
           Считаем корзину и акции за {from}–{to}…
-        </p>
+        </Loader>
       )}
 
       {compare && !bestStock && selectedIds.size === 0 && (
@@ -328,7 +365,7 @@ export function ComparePage() {
 
       {cartProducts.length > 0 && (
         <section className="basket-section" aria-label="Состав корзины">
-          <h3>Корзина скуфа: что внутри?</h3>
+          <h3>Корзина скуфа: как выросла за период?</h3>
           <HorizontalScroller trackClassName="basket-strip" label="корзину">
             {cartProducts.map((p) => (
               <div

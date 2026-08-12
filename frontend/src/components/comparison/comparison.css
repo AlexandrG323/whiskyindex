@@ -18,8 +18,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 1.5rem 1.35rem 1.35rem;
-  border-radius: 20px;
+  padding: clamp(1.1rem, 2.5vw, 1.5rem) clamp(1rem, 2vw, 1.35rem);
+  border-radius: var(--radius-card);
   border: 1px solid #2a2d33;
   background: linear-gradient(145deg, #1e2128 0%, #16181d 100%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
@@ -39,13 +39,16 @@
   justify-content: space-between;
   gap: 1rem;
   flex: 1;
+  flex-wrap: wrap;
 }
 
+/* Must be allowed to shrink: a long RUB amount used to shove the chart out
+   of the card rather than reflowing. */
 .price-info {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  flex-shrink: 0;
+  gap: clamp(1rem, 2vw, 1.25rem);
+  min-width: 0;
 }
 
 .price-info > div {
@@ -77,9 +80,10 @@
 
 .basket-image,
 .product-image {
-  width: min(220px, 42%);
+  width: min(220px, 40%);
   height: auto;
   object-fit: contain;
+  flex-shrink: 0;
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
 }
 
@@ -110,10 +114,14 @@
   margin: 0;
 }
 
+/* Height is bounded rather than derived from the 280×140 viewBox — at
+   `width: 100%` on a wide card the intrinsic 2:1 ratio made it enormous.
+   The polyline carries `vector-effect="non-scaling-stroke"` so the stretch
+   does not thin or thicken the line. */
 .stock-trend-chart svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: clamp(110px, 18vw, 170px);
 }
 
 .stock-trend-chart--empty {
@@ -130,63 +138,38 @@
   color: var(--muted);
 }
 
-.home-intro {
-  margin: 0 0 0.25rem;
-}
-
-.home-intro h2 {
-  margin: 0 0 0.375rem;
-  font-size: 1.35rem;
-  font-weight: 700;
-}
-
-.home-intro p {
-  margin: 0;
-  max-width: 42rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--muted);
-}
+/* Intro typography lives in index.css as the shared `.page-intro` pattern. */
 
 .hero-comparison-skeleton {
   min-height: 220px;
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--border);
   background: var(--card);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 768px) {
   .comparison-row {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
   }
 
-  .comparison-card {
-    padding: 1.25rem 1.1rem 1.1rem;
-    border-radius: 16px;
-  }
-
+  /* Deliberately still a row. Stacking made cart.png and jameson.png span the
+     full card, which upscaled them into a tall blurry block; kept beside the
+     prices they stay small and sharp. The trend chart is width:100% below, so
+     it wraps onto its own line on its own. */
   .comparison-card-body {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1.25rem;
+    align-items: center;
+    gap: 1rem;
   }
 
   .basket-image,
-  .product-image,
+  .product-image {
+    width: min(180px, 46%);
+  }
+
   .stock-trend-chart {
     max-width: 100%;
     width: 100%;
-  }
-}
-
-@media (max-width: 520px) {
-  .comparison-card {
-    padding: 1.1rem 1rem;
-  }
-
-  .price-info {
-    gap: 1rem;
   }
 }

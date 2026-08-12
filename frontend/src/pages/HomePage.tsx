@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { pickTopGrowthStock, pickWorstGrowthStock } from '../components/comparison/comparisonUtils'
 import { type CompareStock, HeroComparison } from '../components/comparison/HeroComparison'
 import { SecondaryComparison } from '../components/comparison/SecondaryComparison'
+import { Loader } from '../components/ui/Loader'
+import { getJson } from '../lib/api'
 
 const DEFAULT_TO_YEAR = 2026
 
@@ -21,14 +23,6 @@ type CompareResponse = {
 
 type StockHistoryResponse = {
   prices: { year: number; amount: number }[]
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
 }
 
 function stockHistoryUrl(stock: CompareStock) {
@@ -55,8 +49,8 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
     let cancelled = false
     setError(null)
     setLoading(true)
-    setHeroStock(null)
-    setWorstStock(null)
+    // Previous year's cards deliberately stay mounted while the new year
+    // loads — clearing them here collapsed the page and shoved the intro down.
 
     const compareUrl = `/api/v1/analytics/compare?from=${year}&to=${toYear}&currency=rub`
 
@@ -105,11 +99,11 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
 
   return (
     <div className={loading ? 'is-loading' : undefined}>
-      <header className="home-intro">
-        <h2>Что было выгоднее?</h2>
-        <p>
-          Сравни стоимость «корзины скуфа» с акцией с максимальным ростом за период
-          {heroStock ? ` — сейчас это ${heroStock.companyName}` : ''}.
+      <header className="page-intro">
+        <h2>Корзина скуфа против акций</h2>
+        <p className="page-intro-lead">
+          С {year} по {toYear} год: сколько стоила корзина повседневных покупок и что за это время
+          сделали акции.
         </p>
       </header>
 
@@ -117,33 +111,40 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
 
       {loading && !compare && (
         <div className="hero-comparison-skeleton" aria-busy="true">
-          <p className="loading">
-            <span className="spinner" aria-hidden="true" />
+          <Loader>
             Считаем корзину и акции за {year}–{toYear}…
-          </p>
+          </Loader>
         </div>
       )}
 
       {compare && heroStock && (
-        <div className="comparison-stack">
-          <HeroComparison
-            fromYear={compare.from}
-            currency={compare.currency}
-            cartFrom={compare.cart.priceFrom}
-            cartTo={compare.cart.priceTo}
-            cartGrowthPercent={compare.cart.growthPercent}
-            stock={heroStock}
-            historyPrices={historyPrices}
-          />
-
-          {worstStock && (
-            <SecondaryComparison
+        <div className="loader-host">
+          <div className="comparison-stack">
+            <HeroComparison
               fromYear={compare.from}
               currency={compare.currency}
-              jameson={compare.jameson}
-              worstStock={worstStock}
-              worstHistoryPrices={worstHistoryPrices}
+              cartFrom={compare.cart.priceFrom}
+              cartTo={compare.cart.priceTo}
+              cartGrowthPercent={compare.cart.growthPercent}
+              stock={heroStock}
+              historyPrices={historyPrices}
             />
+
+            {worstStock && (
+              <SecondaryComparison
+                fromYear={compare.from}
+                currency={compare.currency}
+                jameson={compare.jameson}
+                worstStock={worstStock}
+                worstHistoryPrices={worstHistoryPrices}
+              />
+            )}
+          </div>
+
+          {loading && (
+            <Loader overlay>
+              Считаем за {year}–{toYear}…
+            </Loader>
           )}
         </div>
       )}

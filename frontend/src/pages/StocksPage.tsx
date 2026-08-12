@@ -1,5 +1,6 @@
-/** TODO (домашка): пока достаточно заголовка «Акции». */
 import { useEffect, useState } from 'react'
+import { Loader } from '../components/ui/Loader'
+import { getJson } from '../lib/api'
 
 type Stock = {
   id: string
@@ -13,14 +14,6 @@ type Stock = {
   listedTo: number | null
   displayCurrency: 'RUB' | 'USD'
   importStatus: 'pending' | 'importing' | 'ready' | 'failed'
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
 }
 
 function money(amount: number, currency: 'RUB' | 'USD') {
@@ -97,12 +90,7 @@ export function StocksPage({ year }: StocksPageProps) {
     <div className={loading ? 'is-loading' : undefined}>
       {error && <p className="error">Не удалось загрузить данные: {error}</p>}
 
-      {loading && stocks.length === 0 && (
-        <p className="loading">
-          <span className="spinner" aria-hidden="true" />
-          Загружаем акции за {year}…
-        </p>
-      )}
+      {loading && stocks.length === 0 && <Loader>Загружаем акции за {year}…</Loader>}
 
       <section>
         <h2>
@@ -117,7 +105,7 @@ export function StocksPage({ year }: StocksPageProps) {
                 <span className="logo-placeholder">{s.symbol.slice(0, 2)}</span>
               )}
               <span className="symbol">{s.symbol}</span>
-              <span>{s.companyName}</span>
+              <span className="company">{s.companyName}</span>
               <StockPrice stock={s} />
             </li>
           ))}

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
+import { Select } from './components/ui/Select'
 import { AppLayout } from './layout/AppLayout'
+import { getJson } from './lib/api'
 import { AboutPage } from './pages/AboutPage'
 import { CartPage } from './pages/CartPage'
 import { ComparePage } from './pages/ComparePage'
@@ -11,14 +13,7 @@ const MIN_YEAR = 1998
 const MAX_YEAR = 2026
 const DEFAULT_YEAR = 2007
 const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i)
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
-  }
-  return (await res.json()) as T
-}
+const YEAR_OPTIONS = YEARS.map((y) => ({ value: y, label: String(y) }))
 
 export default function App() {
   const { pathname } = useLocation()
@@ -51,19 +46,17 @@ export default function App() {
         <p className="muted">Бутылка или портфель?</p>
       </div>
       {showHeaderYear && (
-        <>
-          <label className="year-picker">
-            Год
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </label>
-          {exchangeRate && <p className="muted">$1 = {exchangeRate}₽</p>}
-        </>
+        <div className="year-picker">
+          <span className="year-picker-label">Год</span>
+          <Select
+            value={year}
+            options={YEAR_OPTIONS}
+            onChange={setYear}
+            ariaLabel="Год"
+            align="end"
+          />
+          {exchangeRate && <p className="muted year-picker-rate">$1 = {exchangeRate}₽</p>}
+        </div>
       )}
     </header>
   )

@@ -6,35 +6,28 @@
   min-width: 0;
 }
 
-.compare-intro {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
+/* Intro typography lives in index.css as the shared `.page-intro` pattern. */
 
-.compare-intro h2 {
-  margin: 0;
-  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.compare-intro p {
-  margin: 0;
-  max-width: 40rem;
-  font-size: 0.875rem;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
+/* A full-width bar rather than a stacked block: on a wide screen the label
+   sits left, the controls follow it, and the span summary anchors the right
+   edge instead of leaving the row two-thirds empty. */
+/* Items align to the top of the bar and are then nudged down onto the
+   selector's centre line individually — centring the flex row instead would
+   align them to the middle of [selector + rate], sitting visibly low. */
 .compare-period {
   display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem clamp(0.875rem, 2vw, 1.5rem);
   margin-bottom: 0.25rem;
+  padding: clamp(0.875rem, 1.6vw, 1.1rem) clamp(1rem, 2vw, 1.25rem);
+  border: 1px solid #2a2d33;
+  border-radius: var(--radius-card);
+  background: linear-gradient(145deg, #1e2128 0%, #16181d 100%);
 }
 
 .compare-period-label {
+  padding-top: 0.6rem;
   font-size: 0.8125rem;
   color: var(--muted);
 }
@@ -46,50 +39,92 @@
   gap: 0.75rem 1rem;
 }
 
+/* No "От"/"До" captions — two years either side of an arrow already read as
+   a range, and dropping them takes a whole line off the bar's height. */
 .compare-year-block {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.2rem;
   min-width: 0;
 }
 
-.compare-year-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-  min-width: 0;
-}
-
-.compare-year-field select {
-  min-width: 6.5rem;
+.compare-year-block .select {
   width: 100%;
-  max-width: 10rem;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.875rem;
+}
+
+.compare-year-block .select-trigger {
+  min-width: 6.5rem;
 }
 
 .compare-year-rate {
   margin: 0;
-  max-width: 10rem;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
 .compare-period-arrow {
-  align-self: center;
-  margin-top: 1.35rem;
+  align-self: flex-start;
+  padding-top: 0.5rem;
   color: var(--muted);
   font-size: 1.125rem;
   line-height: 1;
+}
+
+/* Sits directly beside the selectors it describes, not pushed to the far
+   edge — the presets take the leftover space instead. */
+.compare-period-span {
+  margin: 0.3rem 0 0;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(233, 146, 46, 0.12);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.compare-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding-top: 0.25rem;
+}
+
+.compare-preset {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.compare-preset:hover {
+  color: var(--text);
+  border-color: #3a3d45;
+}
+
+.compare-preset.is-active {
+  border-color: rgba(233, 146, 46, 0.5);
+  background: rgba(233, 146, 46, 0.1);
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .compare-preset {
+    min-height: var(--tap);
+  }
 }
 
 .compare-hero-grid {
@@ -104,8 +139,8 @@
   flex-direction: column;
   justify-content: center;
   gap: 0.75rem;
-  padding: 1.5rem 1.35rem;
-  border-radius: 20px;
+  padding: clamp(1.15rem, 2.5vw, 1.5rem) clamp(1rem, 2vw, 1.35rem);
+  border-radius: var(--radius-card);
   border: 1px solid #2a2d33;
   background: linear-gradient(160deg, #24180e 0%, #16181d 55%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
@@ -134,9 +169,11 @@
   color: var(--muted);
 }
 
+/* Outer tracks run wide: the chart has plenty of room on a large screen and
+   the picker/equivalents lists were being squeezed into narrow columns. */
 .compare-main-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(200px, 240px);
+  grid-template-columns: minmax(240px, 312px) minmax(0, 1fr) minmax(230px, 286px);
   gap: 1.25rem;
   align-items: stretch;
 }
@@ -145,8 +182,8 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1.25rem;
-  border-radius: 20px;
+  padding: clamp(1rem, 2vw, 1.25rem);
+  border-radius: var(--radius-card);
   border: 1px solid #2a2d33;
   background: linear-gradient(145deg, #1e2128 0%, #16181d 100%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
@@ -166,15 +203,95 @@
   min-height: 0;
 }
 
+/* GrowthChart measures this frame and writes the result as a pixel `width`
+   on its SVG. Without containment the SVG's intrinsic width feeds back into
+   the frame, which the observer re-measures — the chart walks the page off
+   screen. `contain: inline-size` makes the frame's width independent of its
+   contents, which is the contract that measure-and-fill pattern needs. */
+/* The chart now sets the row's height (the picker no longer does), so give it
+   a proper one rather than the old 200px floor. */
 .growth-chart-frame {
+  position: relative;
   flex: 1 1 auto;
   width: 100%;
-  min-height: 200px;
+  min-width: 0;
+  min-height: clamp(240px, 34vh, 420px);
+  overflow: hidden;
+  contain: inline-size;
 }
 
 .growth-chart-svg {
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+/* Anchored to the guide line and flipped to whichever side has room, so it
+   never needs measuring and never escapes the frame's overflow clip. */
+.growth-chart-tooltip {
+  position: absolute;
+  top: 0.5rem;
+  z-index: 4;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #2a2d33;
+  border-radius: 10px;
+  background: rgba(12, 13, 17, 0.96);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  max-width: 62%;
+}
+
+.growth-chart-tooltip-year {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.growth-chart-tooltip ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.growth-chart-tooltip li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6875rem;
+}
+
+.growth-chart-tooltip-label {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.growth-chart-tooltip-value {
+  margin-left: auto;
+  padding-left: 0.5rem;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.growth-chart-tooltip-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.625rem;
+  color: var(--muted);
+}
+
+/* The component sets a pixel `width` attribute from its own measurement;
+   these keep a stale/large value from ever driving layout back outwards. */
+.growth-chart-svg {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: 100%;
 }
 
@@ -193,24 +310,18 @@
   line-height: 1.35;
 }
 
-.compare-badge {
-  flex-shrink: 0;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  background: rgba(233, 146, 46, 0.15);
-  color: var(--accent);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
+/* Grows to fill the panel instead of stopping at a fixed height — the panel
+   is stretched to the chart's height by the grid, so a capped list left a
+   block of dead space under it. */
 .stock-picker-scroll {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 10px;
   gap: 0.35rem;
-  min-height: 0;
-  max-height: min(380px, 50vh);
+  /* basis 0, not auto: the list fills whatever height the row has without its
+     18 items dictating that height (which stretched the chart to ~900px). */
+  flex: 1 1 0;
+  min-height: 8rem;
 }
 
 .stock-picker {
@@ -222,7 +333,7 @@
   gap: 0.15rem;
   overflow-x: hidden;
   overflow-y: auto;
-  max-height: min(380px, 50vh);
+  min-height: 0;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -326,22 +437,63 @@
   transform: rotate(45deg);
 }
 
-.stock-picker-reset {
-  align-self: flex-start;
-  margin-top: auto;
-  padding: 0.25rem 0 0;
-  border: none;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+/* Hugs the bottom of the list. The panel's 1rem row gap above plus its own
+   bottom padding below left a conspicuous empty band around three small
+   icons, so both are trimmed back with negative margins. */
+.picker-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-top: -0.5rem;
+  margin-bottom: -0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.stock-picker-reset:hover {
+.icon-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-menu.is-open .icon-btn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .icon-btn {
+    width: var(--tap);
+    height: var(--tap);
+  }
 }
 
 .growth-chart-legend {
@@ -369,13 +521,19 @@
   flex-shrink: 0;
 }
 
+/* Fills the panel and scrolls rather than overflowing it, so the item count
+   can grow without the footnote being pushed out. */
 .equivalents-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .equivalents-list li {
@@ -434,9 +592,25 @@
   min-width: 0;
 }
 
+/* Edge fades track the real scroll position (see HorizontalScroller): each
+   side appears only while there is content off-screen that way, and both
+   vanish once the list is fully scrolled or fits without scrolling. */
 .h-scroller-track {
   width: 100%;
   min-width: 0;
+  transition: mask-image 0.15s ease;
+}
+
+.h-scroller--fade-right .h-scroller-track {
+  mask-image: linear-gradient(to right, #000 82%, transparent 100%);
+}
+
+.h-scroller--fade-left .h-scroller-track {
+  mask-image: linear-gradient(to left, #000 82%, transparent 100%);
+}
+
+.h-scroller--fade-both .h-scroller-track {
+  mask-image: linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 
 .h-scroller-btn {
@@ -580,8 +754,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Tablet */
-@media (max-width: 1100px) {
+/* Tablet — the advantage card spans, the equivalents panel drops below. */
+@media (max-width: 1024px) {
   .compare-page {
     gap: 1.5rem;
   }
@@ -605,14 +779,18 @@
   }
 }
 
-/* Large phone / small tablet */
-@media (max-width: 800px) {
+/* Everything goes single column. */
+@media (max-width: 768px) {
   .compare-page {
     gap: 1.35rem;
   }
 
+  /* minmax(0, 1fr), never a bare 1fr: `1fr` floors the track at min-content,
+     and GrowthChart writes a pixel `width` onto its SVG, so a bare 1fr lets
+     the chart widen the track, which its ResizeObserver then measures — a
+     feedback loop that runs the page off-screen. */
   .compare-hero-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
 
@@ -621,7 +799,7 @@
   }
 
   .compare-main-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
 
@@ -629,9 +807,11 @@
     grid-column: auto;
   }
 
+  /* Stacked, the chart no longer stretches to a neighbour's height, so it
+     needs one of its own — fluid rather than a hard 240px. */
   .growth-chart-frame {
-    min-height: 220px;
-    height: 240px;
+    min-height: 200px;
+    height: clamp(200px, 45vw, 300px);
     flex: 0 0 auto;
   }
 
@@ -639,60 +819,63 @@
     flex-wrap: wrap;
   }
 
-  .stock-picker-scroll,
-  .stock-picker {
+  /* Stacked, the panel no longer borrows the chart's height, so the list
+     needs a cap of its own again. */
+  .stock-picker-scroll {
+    flex: 0 0 auto;
     max-height: 280px;
-  }
-
-  .compare-year-field select {
-    max-width: none;
-    min-width: 7.5rem;
-  }
-
-  .compare-year-rate {
-    max-width: none;
   }
 }
 
 /* Phone */
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .compare-page {
     gap: 1.25rem;
     padding-bottom: 1rem;
   }
 
+  /* Label and the span pill share the first row; the year controls take the
+     full width below, so the pill never costs a row of its own. Presets
+     follow on their own row.
+     Each row is centred here rather than top-aligned: the desktop nudges
+     line things up with a selector that is no longer on the same row, which
+     left the label and the pill sitting at different heights. */
+  .compare-period {
+    align-items: center;
+  }
+
+  .compare-period-label {
+    padding-top: 0;
+  }
+
+  .compare-period-span {
+    margin-top: 0;
+  }
+
   .compare-period-controls {
+    order: 3;
     width: 100%;
     gap: 0.625rem;
   }
 
+  .compare-presets {
+    order: 4;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  /* Two equal year controls side by side; the arrow between them stops
+     earning its width and is dropped rather than nudged into alignment. */
   .compare-year-block {
-    flex: 1;
+    flex: 1 1 45%;
   }
 
-  .compare-year-field select {
+  .compare-year-block .select-trigger {
     min-width: 0;
-    max-width: none;
-  }
-
-  .compare-year-rate {
-    max-width: none;
   }
 
   .compare-period-arrow {
-    align-self: flex-start;
-    margin-top: 1.55rem;
-    margin-bottom: 0;
-  }
-
-  .compare-panel {
-    padding: 1rem;
-    border-radius: 16px;
-  }
-
-  .advantage-card {
-    padding: 1.15rem 1rem;
-    border-radius: 16px;
+    display: none;
   }
 
   .rank-card {
@@ -702,5 +885,42 @@
 
   .basket-strip-item {
     flex-basis: 108px;
+  }
+}
+
+/* --- Touch ergonomics --- */
+
+@media (hover: none) {
+  /* The 10px drag thumb is unusable with a finger — hand scrolling back to
+     the platform and drop the custom track. */
+  .stock-picker-scroll {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stock-picker-scrollbar {
+    display: none;
+  }
+
+  .stock-picker {
+    scrollbar-width: thin;
+  }
+
+  .stock-picker::-webkit-scrollbar {
+    display: initial;
+    width: 6px;
+  }
+
+  .stock-picker-item {
+    min-height: var(--tap);
+  }
+
+  .compare-year-field select {
+    min-height: var(--tap);
+  }
+
+  /* Swiping is the native gesture here; 32px arrows are a worse target than
+     the track itself. The state-driven edge fades carry the affordance. */
+  .h-scroller-btn {
+    display: none;
   }
 }
