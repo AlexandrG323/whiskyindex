@@ -75,8 +75,7 @@ export function StockPicker({ stocks, selectedIds, onToggle, onReset }: StockPic
   return (
     <aside className="compare-panel" aria-label="Выбор акций">
       <div className="compare-panel-header">
-        <h3>Выберите акции для сравнения</h3>
-        <span className="compare-badge">{selectedIds.size} выбрано</span>
+        <h3>Акции для сравнения: {selectedIds.size}</h3>
       </div>
 
       <div className="stock-picker-scroll">
