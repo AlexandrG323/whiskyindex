@@ -3,7 +3,7 @@
  * См. frontend/HOMEWORK.md и mocks/mock1.png / mock2.png.
  *
  * Нужно:
- * - 6 ссылок (Главная, Корзина скуфа, Акции, Сравнение, История, О проекте)
+ * - 5 ссылок (Главная, Корзина скуфа, Акции, Сравнение, О проекте)
  * - картинка /icons/banner.webp на всю ширину панели
  * - подсветка активного пункта (удобно через NavLink)
  */
@@ -28,9 +28,6 @@ export function Sidebar() {
         </NavLink>
         <NavLink to="/compare" className={({ isActive }) => (isActive ? 'active' : '')}>
           Сравнение
-        </NavLink>
-        <NavLink to="/history" className={({ isActive }) => (isActive ? 'active' : '')}>
-          История
         </NavLink>
         <NavLink to="/about" className={({ isActive }) => (isActive ? 'active' : '')}>
           О проекте

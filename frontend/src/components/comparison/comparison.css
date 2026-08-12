@@ -18,14 +18,15 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 1.75rem 1.5rem 1.5rem;
+  padding: 1.5rem 1.35rem 1.35rem;
   border-radius: 20px;
   border: 1px solid #2a2d33;
   background: linear-gradient(145deg, #1e2128 0%, #16181d 100%);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
-.comparison-card h2 {
+.comparison-card h2,
+.comparison-card .stock-header h2 {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
@@ -158,11 +159,18 @@
   .comparison-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 1rem;
+  }
+
+  .comparison-card {
+    padding: 1.25rem 1.1rem 1.1rem;
+    border-radius: 16px;
   }
 
   .comparison-card-body {
     flex-direction: column;
     align-items: flex-start;
+    gap: 1.25rem;
   }
 
   .basket-image,
@@ -170,5 +178,15 @@
   .stock-trend-chart {
     max-width: 100%;
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .comparison-card {
+    padding: 1.1rem 1rem;
+  }
+
+  .price-info {
+    gap: 1rem;
   }
 }

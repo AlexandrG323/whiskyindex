@@ -18,13 +18,13 @@ interface AppLayoutProps {
 export function AppLayout({ header }: AppLayoutProps) {
   return (
     <div className="app-layout">
-      <Sidebar />
-      <div className="app-content">
-        {header}
-        <main className="page-body">
-          <Outlet />
-        </main>
+      <div className="app-sticky-chrome">
+        <Sidebar />
+        <div className="app-sticky-header">{header}</div>
       </div>
+      <main className="app-content page-body">
+        <Outlet />
+      </main>
     </div>
   )
 }

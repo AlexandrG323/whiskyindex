@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './layout/AppLayout'
 import { AboutPage } from './pages/AboutPage'
 import { CartPage } from './pages/CartPage'
 import { ComparePage } from './pages/ComparePage'
-import { HistoryPage } from './pages/HistoryPage'
 import { HomePage } from './pages/HomePage'
 import { StocksPage } from './pages/StocksPage'
 
@@ -22,10 +21,15 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function App() {
+  const { pathname } = useLocation()
+  const showHeaderYear = pathname !== '/compare'
+
   const [year, setYear] = useState(DEFAULT_YEAR)
   const [exchangeRate, setExchangeRate] = useState<number | null>(null)
 
   useEffect(() => {
+    if (!showHeaderYear) return
+
     let cancelled = false
     getJson<number>(`/api/v1/analytics/exchange-rate?year=${year}`)
       .then((rate) => {
@@ -37,7 +41,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [year])
+  }, [year, showHeaderYear])
 
   const header = (
     <header className="masthead">
@@ -46,17 +50,21 @@ export default function App() {
         <h1>Whisky Index</h1>
         <p className="muted">Бутылка или портфель?</p>
       </div>
-      <label className="year-picker">
-        Год
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {YEARS.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </label>
-      {exchangeRate && <p className="muted">Курс $: {exchangeRate}</p>}
+      {showHeaderYear && (
+        <>
+          <label className="year-picker">
+            Год
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          {exchangeRate && <p className="muted">Курс $: {exchangeRate}</p>}
+        </>
+      )}
     </header>
   )
 
@@ -67,7 +75,6 @@ export default function App() {
         <Route path="/cart" element={<CartPage year={year} />} />
         <Route path="/stocks" element={<StocksPage year={year} />} />
         <Route path="/compare" element={<ComparePage />} />
-        <Route path="/history" element={<HistoryPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>
     </Routes>
