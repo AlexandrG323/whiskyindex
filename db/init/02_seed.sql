@@ -81,7 +81,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- Product prices: see 03_product_prices.sql
 
 -- ---------------------------------------------------------------------------
--- USD/RUB average yearly rates (approximate fixtures)
+-- USD/RUB average yearly rates (CBR daily-average, 2026 is YTD)
 -- ---------------------------------------------------------------------------
 INSERT INTO exchange_rates (year, base_currency, quote_currency, rate, source)
 SELECT
@@ -117,10 +117,10 @@ FROM (
     (2020, 72.15000000),
     (2021, 73.65000000),
     (2022, 68.55000000),
-    (2023, 84.70000000),
-    (2024, 92.50000000),
-    (2025, 95.00000000),
-    (2026, 98.00000000)
+    (2023, 85.25000000),
+    (2024, 92.57000000),
+    (2025, 83.62000000),
+    (2026, 78.00000000)
 ) AS t(year, rate)
 ON CONFLICT (year, base_currency, quote_currency) DO UPDATE SET
   rate = EXCLUDED.rate,

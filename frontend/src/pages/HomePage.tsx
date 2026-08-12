@@ -35,6 +35,8 @@ interface HomePageProps {
 }
 
 export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
+  // Compare needs a real span. Picking the end year (2026) means last year → now.
+  const fromYear = Math.min(year, toYear - 1)
   const [compare, setCompare] = useState<CompareResponse | null>(null)
   const [heroStock, setHeroStock] = useState<CompareStock | null>(null)
   const [worstStock, setWorstStock] = useState<CompareStock | null>(null)
@@ -52,7 +54,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
     // Previous year's cards deliberately stay mounted while the new year
     // loads — clearing them here collapsed the page and shoved the intro down.
 
-    const compareUrl = `/api/v1/analytics/compare?from=${year}&to=${toYear}&currency=rub`
+    const compareUrl = `/api/v1/analytics/compare?from=${fromYear}&to=${toYear}&currency=rub`
 
     getJson<CompareResponse>(compareUrl)
       .then(async (data) => {
@@ -95,15 +97,15 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
     return () => {
       cancelled = true
     }
-  }, [year, toYear])
+  }, [fromYear, toYear])
 
   return (
     <div className={loading ? 'is-loading' : undefined}>
       <header className="page-intro">
         <h2>Корзина скуфа против акций</h2>
         <p className="page-intro-lead">
-          С {year} по {toYear} год: сколько стоила корзина повседневных покупок и что за это время
-          сделали акции.
+          С {fromYear} по {toYear} год: сколько стоила корзина повседневных покупок и что за это
+          время сделали акции.
         </p>
       </header>
 
@@ -112,7 +114,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
       {loading && !compare && (
         <div className="hero-comparison-skeleton" aria-busy="true">
           <Loader>
-            Считаем корзину и акции за {year}–{toYear}…
+            Считаем корзину и акции за {fromYear}–{toYear}…
           </Loader>
         </div>
       )}
@@ -143,7 +145,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
 
           {loading && (
             <Loader overlay>
-              Считаем за {year}–{toYear}…
+              Считаем за {fromYear}–{toYear}…
             </Loader>
           )}
         </div>
