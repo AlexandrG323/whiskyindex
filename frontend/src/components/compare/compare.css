@@ -178,6 +178,14 @@
   align-items: stretch;
 }
 
+/* Contribute 0 to the row so the chart sets its height; then fill that
+   height and scroll. Overflow stays visible — IconMenu opens past the card. */
+.compare-main-grid > :first-child,
+.compare-main-grid > :nth-child(3) {
+  height: 0;
+  min-height: 100%;
+}
+
 .compare-panel {
   display: flex;
   flex-direction: column;
@@ -192,32 +200,34 @@
 }
 
 .growth-chart-panel {
-  align-self: stretch;
+  /* Size to the chart, don't stretch to a taller neighbour. Stretching the
+     panel used to flex-grow the frame, the ResizeObserver wrote that height
+     onto the SVG, and the SVG's intrinsic size grew the row — a loop that
+     animated both the picker and the chart taller on every layout shift. */
+  align-self: start;
 }
 
 .growth-chart-body {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
   min-height: 0;
 }
 
-/* GrowthChart measures this frame and writes the result as a pixel `width`
-   on its SVG. Without containment the SVG's intrinsic width feeds back into
-   the frame, which the observer re-measures — the chart walks the page off
-   screen. `contain: inline-size` makes the frame's width independent of its
-   contents, which is the contract that measure-and-fill pattern needs. */
-/* The chart now sets the row's height (the picker no longer does), so give it
-   a proper one rather than the old 200px floor. */
+/* GrowthChart measures this frame and writes the result as pixel width/height
+   on its SVG. Without containment those attributes feed back into the frame,
+   which the observer re-measures — the chart walks the page. `contain: size`
+   makes the frame independent of its contents on both axes. A definite
+   `height` (not min-height + flex-grow) is what gives size containment a
+   used height, and is what the picker stretches to. */
 .growth-chart-frame {
   position: relative;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
-  min-height: clamp(240px, 34vh, 420px);
+  height: clamp(240px, 34vh, 420px);
   overflow: hidden;
-  contain: inline-size;
+  contain: size;
 }
 
 .growth-chart-svg {
@@ -789,8 +799,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Tablet — the advantage card spans, the equivalents panel drops below. */
-@media (max-width: 1024px) {
+/* Mid-size: sidebar rail is already on at 1024px, so three columns leave the
+   chart a sliver. Hold the 2-col layout (equivalents below, advantage spans)
+   until 1280px, where sidebar + picker + chart + list actually fit. */
+@media (max-width: 1280px) {
   .compare-page {
     gap: 1.5rem;
   }
@@ -811,6 +823,8 @@
 
   .compare-main-grid > :nth-child(3) {
     grid-column: 1 / -1;
+    height: auto;
+    min-height: 0;
   }
 }
 
@@ -838,16 +852,15 @@
     gap: 1rem;
   }
 
+  .compare-main-grid > :first-child,
   .compare-main-grid > :nth-child(3) {
     grid-column: auto;
+    height: auto;
+    min-height: 0;
   }
 
-  /* Stacked, the chart no longer stretches to a neighbour's height, so it
-     needs one of its own — fluid rather than a hard 240px. */
   .growth-chart-frame {
-    min-height: 200px;
     height: clamp(200px, 45vw, 300px);
-    flex: 0 0 auto;
   }
 
   .compare-panel-header {
