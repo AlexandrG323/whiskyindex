@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { MonthlyCandle } from '../types'
+import type { CandleFetchResult, MonthlyCandle } from '../types'
+
+type MoexTable = {
+  columns: string[]
+  data: (number | string | null)[][]
+}
 
 type MoexCandlesResponse = {
-  candles?: {
-    columns: string[]
-    data: (number | string)[]
-  }
+  candles?: MoexTable
+}
+
+type MoexSecuritiesResponse = {
+  description?: MoexTable
 }
 
 /**
@@ -69,7 +75,7 @@ export class MoexClient {
     symbol: string,
     fromYear: number,
     toYear: number,
-  ): Promise<MonthlyCandle[]> {
+  ): Promise<CandleFetchResult> {
     const from = `${fromYear}-01-01`
     const till = `${toYear}-12-31`
     const candles: MonthlyCandle[] = []
@@ -123,6 +129,43 @@ export class MoexClient {
     }
 
     this.logger.log(`Fetched ${candles.length} monthly candles from MOEX for ${symbol}`)
-    return candles
+    const companyName = await this.fetchSecurityName(symbol)
+    return { candles, companyName }
+  }
+
+  /**
+   * ISS description: SHORTNAME is what the terminal shows (ТБанк, Sberbank).
+   * Bare ticker as company_name collides in the UI — FMP's T.png is AT&T.
+   */
+  async fetchSecurityName(symbol: string): Promise<string | null> {
+    try {
+      const url = `https://iss.moex.com/iss/securities/${encodeURIComponent(
+        symbol,
+      )}.json?iss.meta=off&iss.only=description`
+      const res = await fetch(url)
+      if (!res.ok) return null
+
+      const json = (await res.json()) as MoexSecuritiesResponse
+      const table = json.description
+      if (!table?.columns || !table.data) return null
+
+      const nameIdx = table.columns.indexOf('name')
+      const valueIdx = table.columns.indexOf('value')
+      if (nameIdx < 0 || valueIdx < 0) return null
+
+      const fields = new Map<string, string>()
+      for (const row of table.data) {
+        const key = String(row[nameIdx] ?? '')
+        const value = row[valueIdx]
+        if (value !== null && value !== undefined && String(value).trim()) {
+          fields.set(key, String(value).trim())
+        }
+      }
+
+      return fields.get('SHORTNAME') ?? fields.get('NAME') ?? fields.get('SECNAME') ?? null
+    } catch (err) {
+      this.logger.warn(`MOEX name lookup failed for ${symbol}: ${(err as Error).message}`)
+      return null
+    }
   }
 }

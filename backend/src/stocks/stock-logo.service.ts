@@ -44,8 +44,29 @@ export class StockLogoService {
    * Never throws: a stock without a logo is a perfectly good stock, and this
    * runs inside resolve, where an upstream outage must not fail the request.
    * Returns the URL to store in stocks.image_url, or null.
+   *
+   * FMP indexes US tickers only. Looking up MOEX `T` returns AT&T's logo —
+   * skip that venue rather than attach the wrong issuer.
    */
-  async fetchAndStore(stockId: string, symbol: string): Promise<string | null> {
+  async fetchAndStore(
+    stockId: string,
+    symbol: string,
+    source: 'moex' | 'yahoo' = 'yahoo',
+  ): Promise<string | null> {
+    if (source === 'moex') {
+      this.logger.log(`Skipping US logo lookup for MOEX ${symbol}`)
+      try {
+        await this.pool.query(`DELETE FROM stock_logos WHERE stock_id = $1`, [stockId])
+        await this.pool.query(
+          `UPDATE stocks SET image_url = NULL, image_cached_at = NULL WHERE id = $1`,
+          [stockId],
+        )
+      } catch (err) {
+        this.logger.warn(`Failed to clear logo for MOEX ${symbol}: ${(err as Error).message}`)
+      }
+      return null
+    }
+
     try {
       const res = await fetch(SOURCE_URL(symbol), {
         headers: { 'User-Agent': 'WhiskyIndex/0.1' },

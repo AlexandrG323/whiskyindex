@@ -47,3 +47,8 @@ export function postJson<T>(url: string, body: unknown): Promise<T> {
     }),
   )
 }
+
+/** Uncached fetch — for resolve/poll, where the same URL's status changes. */
+export function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  return json<T>(url, init)
+}

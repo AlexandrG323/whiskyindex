@@ -1,5 +1,5 @@
 import './comparison.css'
-import { stockInvestmentRange, stockLogoUrl } from './comparisonUtils'
+import { stockInvestmentRange } from './comparisonUtils'
 import type { CompareStock } from './HeroComparison'
 import { StockCard } from './StockCard'
 import { WhiskyCard } from './WhiskyCard'
@@ -42,7 +42,8 @@ export function SecondaryComparison({
       <StockCard
         companyName={worstStock.companyName}
         heading={`Худший рост: ${worstStock.companyName}`}
-        imageUrl={stockLogoUrl(worstStock)}
+        symbol={worstStock.symbol}
+        imageUrl={worstStock.imageUrl}
         fromYear={worstStock.priceFromYear}
         toYear={worstStock.priceToYear}
         startPrice={investment.from}

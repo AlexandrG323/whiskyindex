@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AddCustomStockDialog } from '../components/compare/AddCustomStockDialog'
 import {
   EquivalentsPanel,
   pickTopGrowthStock,
@@ -6,11 +7,20 @@ import {
 } from '../components/compare/ComparePanels'
 import { GrowthChart } from '../components/compare/GrowthChart'
 import { HorizontalScroller } from '../components/compare/HorizontalScroller'
-import { StockPicker } from '../components/compare/StockPicker'
+import { ALL_EXCHANGES, StockPicker } from '../components/compare/StockPicker'
 import type { CompareStock } from '../components/comparison/HeroComparison'
 import { Loader } from '../components/ui/Loader'
 import { Select } from '../components/ui/Select'
 import { getJson, postJson } from '../lib/api'
+import {
+  type CustomStock,
+  customStockIds,
+  listingKey,
+  loadCustomStocks,
+  removeCustomStock,
+  replaceCustomStocks,
+  saveCustomStock,
+} from '../lib/customStocks'
 import '../components/compare/compare.css'
 import '../components/comparison/comparison.css'
 
@@ -64,6 +74,11 @@ function yearsLabel(count: number) {
   return `${count} лет`
 }
 
+function stocksForExchange(stocks: CompareStock[], exchange: string) {
+  if (exchange === ALL_EXCHANGES) return stocks
+  return stocks.filter((stock) => stock.exchange === exchange)
+}
+
 function formatGrowth(value: number) {
   const rounded = Math.round(value)
   const sign = rounded >= 0 ? '+' : ''
@@ -112,6 +127,11 @@ export function ComparePage() {
   const [toRate, setToRate] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [customStocks, setCustomStocks] = useState<CustomStock[]>(loadCustomStocks)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [exchangeFilter, setExchangeFilter] = useState(ALL_EXCHANGES)
+  const customIdsKey = customStockIds(customStocks).join(',')
+  const customIdSet = useMemo(() => new Set(customStockIds(customStocks)), [customStocks])
 
   const setFromYear = (year: number) => {
     setFrom(year)
@@ -152,10 +172,18 @@ export function ComparePage() {
     setLoading(true)
     setError(null)
 
-    const compareUrl = `/api/v1/analytics/compare?from=${from}&to=${to}&currency=rub`
+    const compareUrlPromise = (async () => {
+      const base = `/api/v1/analytics/compare?from=${from}&to=${to}&currency=rub`
+      if (!customIdsKey) return base
+      const curated = await getJson<{ id: string }[]>(
+        `/api/v1/stocks?year=${to}&currency=rub&curated_only=true`,
+      )
+      const ids = [...new Set([...curated.map((s) => s.id), ...customIdsKey.split(',')])]
+      return `${base}&stockIds=${ids.join(',')}`
+    })()
 
     Promise.all([
-      getJson<CompareResponse>(compareUrl),
+      compareUrlPromise.then((url) => getJson<CompareResponse>(url)),
       getJson<CartProduct[]>(`/api/v1/products/cart?year=${from}`),
       getJson<CartProduct[]>(`/api/v1/products/cart?year=${to}`),
     ])
@@ -164,6 +192,11 @@ export function ComparePage() {
 
         setCompare(data)
         setCartProducts(mergeCartProducts(cartFrom, cartTo))
+        setCustomStocks((prev) => {
+          const present = new Set(data.stocks.map((stock) => stock.id))
+          const kept = prev.filter((stock) => present.has(stock.id))
+          return kept.length === prev.length ? prev : replaceCustomStocks(kept)
+        })
         setSelectedIds((prev) => {
           if (prev.size === 0) {
             return new Set(data.stocks.map((s) => s.id))
@@ -203,12 +236,49 @@ export function ComparePage() {
     return () => {
       cancelled = true
     }
-  }, [from, to])
+  }, [from, to, customIdsKey])
 
-  const selectedStocks = useMemo(() => {
+  const displayStocks = useMemo(() => {
     if (!compare) return []
-    return compare.stocks.filter((s) => selectedIds.has(s.id))
-  }, [compare, selectedIds])
+    const names = new Map(
+      customStocks.flatMap((stock) =>
+        stock.customName ? [[stock.id, stock.customName] as const] : [],
+      ),
+    )
+    if (names.size === 0) return compare.stocks
+    return compare.stocks.map((stock) => {
+      const customName = names.get(stock.id)
+      return customName ? { ...stock, companyName: customName } : stock
+    })
+  }, [compare, customStocks])
+
+  const visibleStocks = useMemo(
+    () => stocksForExchange(displayStocks, exchangeFilter),
+    [displayStocks, exchangeFilter],
+  )
+
+  const selectedStocks = useMemo(
+    () => visibleStocks.filter((s) => selectedIds.has(s.id)),
+    [visibleStocks, selectedIds],
+  )
+
+  useEffect(() => {
+    if (exchangeFilter === ALL_EXCHANGES) return
+    if (displayStocks.some((stock) => stock.exchange === exchangeFilter)) return
+    setExchangeFilter(ALL_EXCHANGES)
+  }, [displayStocks, exchangeFilter])
+
+  const existingListings = useMemo(() => {
+    const listings = new Set<string>()
+    for (const stock of customStocks) listings.add(listingKey(stock.symbol, stock.exchange))
+    return listings
+  }, [customStocks])
+
+  const existingIds = useMemo(() => {
+    const ids = new Set<string>(customIdSet)
+    for (const stock of displayStocks) ids.add(stock.id)
+    return ids
+  }, [customIdSet, displayStocks])
 
   const bestStock = useMemo(() => pickTopGrowthStock(selectedStocks), [selectedStocks])
 
@@ -241,12 +311,25 @@ export function ComparePage() {
     })
   }
 
-  // Doubles as "select all": once the list is empty the button's only useful
-  // job is putting everything back.
+  // Doubles as "select all": once the visible list is empty the button's only
+  // useful job is putting those rows back. Hidden exchanges keep their state.
   const resetSelection = () => {
-    setSelectedIds((prev) =>
-      prev.size > 0 ? new Set() : new Set(compare?.stocks.map((s) => s.id) ?? []),
-    )
+    setSelectedIds((prev) => {
+      const anyVisibleSelected = visibleStocks.some((stock) => prev.has(stock.id))
+      if (anyVisibleSelected) {
+        const next = new Set(prev)
+        for (const stock of visibleStocks) next.delete(stock.id)
+        return next
+      }
+      const next = new Set(prev)
+      for (const stock of visibleStocks) next.add(stock.id)
+      return next
+    })
+  }
+
+  const applyExchangeFilter = (exchange: string) => {
+    setExchangeFilter(exchange)
+    setSelectedIds(new Set(stocksForExchange(displayStocks, exchange).map((stock) => stock.id)))
   }
 
   return (
@@ -317,17 +400,29 @@ export function ComparePage() {
         </Loader>
       )}
 
-      {compare && !bestStock && selectedIds.size === 0 && (
+      {compare && !bestStock && selectedStocks.length === 0 && (
         <p className="notice">Отметьте хотя бы одну акцию в списке.</p>
       )}
 
       {compare && (
         <div className="compare-main-grid">
           <StockPicker
-            stocks={compare.stocks}
+            stocks={displayStocks}
             selectedIds={selectedIds}
             onToggle={toggleStock}
             onReset={resetSelection}
+            exchange={exchangeFilter}
+            onExchangeChange={applyExchangeFilter}
+            onAdd={() => setDialogOpen(true)}
+            customIds={customIdSet}
+            onRemoveCustom={(id) => {
+              setCustomStocks(removeCustomStock(id))
+              setSelectedIds((prev) => {
+                const next = new Set(prev)
+                next.delete(id)
+                return next
+              })
+            }}
           />
 
           <GrowthChart
@@ -397,6 +492,17 @@ export function ComparePage() {
           </HorizontalScroller>
         </section>
       )}
+
+      <AddCustomStockDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        existingListings={existingListings}
+        existingIds={existingIds}
+        onAdded={(stock) => {
+          setCustomStocks(saveCustomStock(stock))
+          setSelectedIds((prev) => new Set(prev).add(stock.id))
+        }}
+      />
     </div>
   )
 }

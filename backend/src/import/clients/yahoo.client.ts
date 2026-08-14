@@ -1,9 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { MonthlyCandle } from '../types'
+import type { CandleFetchResult, MonthlyCandle } from '../types'
 
 type YahooChartResponse = {
   chart?: {
     result?: Array<{
+      meta?: {
+        shortName?: string
+        longName?: string
+      }
       timestamp?: number[]
       indicators?: {
         quote?: Array<{
@@ -82,7 +86,7 @@ export class YahooClient {
     symbol: string,
     fromYear: number,
     toYear: number,
-  ): Promise<MonthlyCandle[]> {
+  ): Promise<CandleFetchResult> {
     const yahooSymbol = symbol === 'SPX' ? '^GSPC' : symbol
 
     const period1 = Math.floor(Date.UTC(fromYear, 0, 1) / 1000)
@@ -110,7 +114,7 @@ export class YahooClient {
     const result = json.chart?.result?.[0]
 
     if (!result?.timestamp || !result.indicators?.quote?.[0]) {
-      return []
+      return { candles: [], companyName: result?.meta?.longName ?? result?.meta?.shortName ?? null }
     }
 
     const timestamps = result.timestamp
@@ -144,6 +148,9 @@ export class YahooClient {
     }
 
     this.logger.log(`Fetched ${candles.length} monthly candles from Yahoo for ${symbol}`)
-    return candles
+    return {
+      candles,
+      companyName: result.meta?.longName ?? result.meta?.shortName ?? null,
+    }
   }
 }

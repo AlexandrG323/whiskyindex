@@ -194,6 +194,7 @@ export class AnalyticsService {
       id: endpoints.id,
       symbol: endpoints.symbol,
       companyName: endpoints.companyName,
+      exchange: endpoints.exchange,
       imageUrl: endpoints.imageUrl,
       priceFromYear: endpoints.fromYear,
       priceToYear: endpoints.toYear,

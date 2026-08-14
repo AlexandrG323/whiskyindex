@@ -1,11 +1,8 @@
 import { BasketCard } from '../comparison/BasketCard'
-import {
-  pickTopGrowthStock,
-  stockInvestmentRange,
-  stockLogoUrl,
-} from '../comparison/comparisonUtils'
+import { pickTopGrowthStock, stockInvestmentRange } from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
 import { StockCard } from '../comparison/StockCard'
+import { StockLogo } from '../comparison/StockLogo'
 import { HorizontalScroller } from './HorizontalScroller'
 
 export { pickTopGrowthStock }
@@ -66,16 +63,11 @@ export function RankingRow({ stocks, cartGrowthPercent }: RankingRowProps) {
       <HorizontalScroller trackClassName="ranking-row" label="рейтинг">
         {ranked.map((stock, index) => {
           const vsCart = stock.growthPercent - cartGrowthPercent
-          const logo = stockLogoUrl(stock)
           return (
             <article key={stock.id} className="rank-card">
               <div className="rank-card-top">
                 <span className="rank-index">{index + 1}</span>
-                {logo ? (
-                  <img src={logo} alt="" width={28} height={28} loading="lazy" />
-                ) : (
-                  <span className="rank-card-fallback">{stock.symbol.slice(0, 2)}</span>
-                )}
+                <StockLogo symbol={stock.symbol} src={stock.imageUrl} size={28} />
               </div>
               <h4>{stock.companyName}</h4>
               <p
@@ -192,7 +184,8 @@ export function CompareHeroRow({
       <StockCard
         companyName={stock.companyName}
         heading={stock.companyName}
-        imageUrl={stockLogoUrl(stock)}
+        symbol={stock.symbol}
+        imageUrl={stock.imageUrl}
         fromYear={stock.priceFromYear}
         toYear={stock.priceToYear}
         startPrice={investment.from}

@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
   RequestTimeoutException,
+  UnprocessableEntityException,
 } from '@nestjs/common'
 import type { Pool } from 'pg'
 import { MAX_YEAR, MIN_YEAR } from '../common/years'
@@ -303,6 +304,7 @@ export class StocksService {
     id: string
     symbol: string
     companyName: string
+    exchange: string
     imageUrl: string | null
     fromYear: number
     toYear: number
@@ -318,8 +320,15 @@ export class StocksService {
     const hasCompleteHistory = rows.length === expectedYears
 
     if (!hasCompleteHistory) {
-      await this.ensureImported(id, from, to)
-      rows = await this.queryYearlyNativePrices(id, from, to)
+      if (detail.importStatus === 'failed') {
+        throw new UnprocessableEntityException(`Stock "${id}" import failed`)
+      }
+      // `ready` with gaps is IPO/delisting, not a cache miss — do not re-hit
+      // Yahoo/MOEX on every compare load (that hung the page for a minute).
+      if (detail.importStatus !== 'ready') {
+        await this.ensureImported(id, from, to)
+        rows = await this.queryYearlyNativePrices(id, from, to)
+      }
     }
 
     if (rows.length === 0) {
@@ -362,6 +371,7 @@ export class StocksService {
       id: detail.id,
       symbol: detail.symbol,
       companyName: detail.companyName,
+      exchange: detail.exchange,
       imageUrl: detail.imageUrl,
       fromYear: fromPoint.year,
       toYear: toPoint.year,
@@ -399,8 +409,17 @@ export class StocksService {
     )
     const status = statusRows[0]?.import_status
 
+    if (status === 'failed') {
+      throw new UnprocessableEntityException(`Stock "${id}" import failed`)
+    }
+
+    if (status === 'ready') {
+      return
+    }
+
     if (status === 'importing') {
       await this.waitUntilImportSettled(id)
+      return
     }
 
     const cached = await this.queryYearlyNativePrices(id, from, to)
@@ -420,7 +439,7 @@ export class StocksService {
     }
   }
 
-  private async waitUntilImportSettled(id: string, timeoutMs = 60_000): Promise<void> {
+  private async waitUntilImportSettled(id: string, timeoutMs = 8_000): Promise<void> {
     const started = Date.now()
     while (Date.now() - started < timeoutMs) {
       const { rows } = await this.pool.query<{ import_status: string }>(
@@ -492,44 +511,39 @@ export class StocksService {
       [id, from, to],
     )
 
-    // CACHE MISS: Запускаем импорт, если строк в БД пока нет
-
     const existingYears = rows.map((row) => Number(row.year))
-
     const expectedYearsCount = to - from + 1
-
     const hasCompleteHistory = existingYears.length === expectedYearsCount
 
     if (!hasCompleteHistory) {
-      // Проверяем, существует ли акция вообще
-      await this.getById(id)
-
-      // Импортируем синхронно
-      await this.stockImport.importStockById(id, from, to)
-
-      // Повторяем выборку после успешного импорта
-      const retryResult = await this.pool.query(
-        `
-          SELECT
-            s.id,
-            s.symbol,
-            s.image_url,
-            s.native_currency,
-            s.import_status,
-            sp.year,
-            sp.average_price
-          FROM stocks AS s
-          JOIN stock_prices AS sp
-            ON sp.stock_id = s.id
-          WHERE
-            s.id = $1
-            AND sp.year BETWEEN $2 AND $3
-          ORDER BY sp.year ASC
-        `,
-        [id, from, to],
-      )
-
-      rows = retryResult.rows
+      const detail = await this.getById(id)
+      if (detail.importStatus === 'failed') {
+        throw new UnprocessableEntityException(`Stock "${id}" import failed`)
+      }
+      if (detail.importStatus !== 'ready') {
+        await this.stockImport.importStockById(id, from, to)
+        const retryResult = await this.pool.query(
+          `
+            SELECT
+              s.id,
+              s.symbol,
+              s.image_url,
+              s.native_currency,
+              s.import_status,
+              sp.year,
+              sp.average_price
+            FROM stocks AS s
+            JOIN stock_prices AS sp
+              ON sp.stock_id = s.id
+            WHERE
+              s.id = $1
+              AND sp.year BETWEEN $2 AND $3
+            ORDER BY sp.year ASC
+          `,
+          [id, from, to],
+        )
+        rows = retryResult.rows
+      }
     }
 
     if (rows.length === 0) {
@@ -598,7 +612,7 @@ export class StocksService {
 
     let { rows } = await this.pool.query(
       `
-        SELECT id, symbol, import_status, image_url
+        SELECT id, symbol, import_status, image_url, source
         FROM stocks
         WHERE symbol = $1 AND exchange = $2
         LIMIT 1
@@ -607,6 +621,7 @@ export class StocksService {
     )
 
     // Если акции нет в базе — создаем запись и запускаем импорт
+    let created = false
     if (rows.length === 0) {
       const source = exchange === 'MOEX' || exchange === 'TQBR' ? 'moex' : 'yahoo'
       const nativeCurrency = source === 'moex' ? 'RUB' : 'USD'
@@ -615,32 +630,47 @@ export class StocksService {
         `
         INSERT INTO stocks (symbol, company_name, country, exchange, source, native_currency, import_status)
         VALUES ($1, $1, $2, $3, $4, $5, 'pending')
-        RETURNING id, symbol, import_status, image_url
+        RETURNING id, symbol, import_status, image_url, source
         `,
         [symbol, source === 'moex' ? 'Russia' : 'USA', exchange, source, nativeCurrency],
       )
 
       rows = insertResult.rows
-      const newStock = rows[0]
-
-      // Запускаем импорт для новой акции
-      // Explicit range: a resolved stock must cover the same years as a
-      // curated one. Relying on the default left NVDA starting at 2007
-      // despite its 1999 IPO, and prices_cached_at then pinned that gap
-      // permanently because the list never re-imports a cached stock.
-      await this.stockImport.importStockById(newStock.id, MIN_YEAR, MAX_YEAR)
-
-      // Логотип: best-effort, не влияет на импорт цен. Сервис не бросает —
-      // акция без логотипа полностью работоспособна.
-      await this.stockLogo.fetchAndStore(newStock.id, symbol)
-
-      // Запрашиваем обновленный статус
-      const updated = await this.pool.query(
-        `SELECT id, symbol, import_status, image_url FROM stocks WHERE id = $1`,
-        [newStock.id],
-      )
-      rows = updated.rows
+      created = true
     }
+
+    const stock = rows[0]
+    const { rows: priceRows } = await this.pool.query(
+      `SELECT 1 FROM stock_prices WHERE stock_id = $1 LIMIT 1`,
+      [stock.id],
+    )
+    const needsImport = stock.import_status !== 'ready' || priceRows.length === 0
+
+    if (needsImport) {
+      try {
+        // Explicit range: a resolved stock must cover the same years as a
+        // curated one. Relying on the default left NVDA starting at 2007
+        // despite its 1999 IPO, and prices_cached_at then pinned that gap
+        // permanently because the list never re-imports a cached stock.
+        await this.stockImport.importStockById(stock.id, MIN_YEAR, MAX_YEAR)
+      } catch {
+        // importStockById already persisted import_status = failed
+      }
+    }
+
+    const source = stock.source === 'moex' ? 'moex' : 'yahoo'
+    if (created || source === 'moex') {
+      await this.stockLogo.fetchAndStore(stock.id, symbol, source)
+    }
+    if (source === 'moex') {
+      await this.stockImport.refreshCompanyName(stock.id)
+    }
+
+    const updated = await this.pool.query(
+      `SELECT id, symbol, import_status, image_url FROM stocks WHERE id = $1`,
+      [stock.id],
+    )
+    rows = updated.rows
 
     const [row] = rows
 

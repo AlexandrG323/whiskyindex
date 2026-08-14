@@ -1,12 +1,13 @@
 import './comparison.css'
 import { BasketCard } from './BasketCard'
-import { stockInvestmentRange, stockLogoUrl } from './comparisonUtils'
+import { stockInvestmentRange } from './comparisonUtils'
 import { StockCard } from './StockCard'
 
 export type CompareStock = {
   id: string
   symbol: string
   companyName: string
+  exchange: string
   imageUrl: string | null
   priceFromYear: number
   priceToYear: number
@@ -50,7 +51,8 @@ export function HeroComparison({
 
       <StockCard
         companyName={stock.companyName}
-        imageUrl={stockLogoUrl(stock)}
+        symbol={stock.symbol}
+        imageUrl={stock.imageUrl}
         fromYear={stock.priceFromYear}
         toYear={stock.priceToYear}
         startPrice={investment.from}

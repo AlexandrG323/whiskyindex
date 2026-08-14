@@ -9,6 +9,7 @@ import type { MonthlyCandle, YearlyAveragePrice } from './types'
 type StockRow = {
   id: string
   symbol: string
+  company_name: string
   source: 'moex' | 'yahoo'
   native_currency: 'RUB' | 'USD'
   import_status: string
@@ -67,13 +68,29 @@ export class StockImportService {
 
     try {
       let candles: MonthlyCandle[] = []
+      let companyName: string | null = null
       if (stock.source === 'moex') {
-        candles = await this.moex.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+        const fetched = await this.moex.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+        candles = fetched.candles
+        companyName = fetched.companyName
       } else {
-        candles = await this.yahoo.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+        const fetched = await this.yahoo.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
+        candles = fetched.candles
+        companyName = fetched.companyName
+      }
+
+      if (companyName && stock.company_name === stock.symbol) {
+        await this.pool.query(
+          `UPDATE stocks SET company_name = $2, updated_at = now() WHERE id = $1`,
+          [stockId, companyName],
+        )
       }
 
       const yearlyPrices = this.averageByYear(candles, stock.native_currency)
+
+      if (candles.length === 0 || yearlyPrices.length === 0) {
+        throw new Error(`No price data for ${stock.symbol} (${stock.source})`)
+      }
 
       await this.persistYearlyPrices(stockId, yearlyPrices)
 
@@ -198,7 +215,7 @@ export class StockImportService {
   async getStockOrThrow(stockId: string): Promise<StockRow> {
     const { rows } = await this.pool.query<StockRow>(
       `
-      SELECT id, symbol, source, native_currency, import_status
+      SELECT id, symbol, company_name, source, native_currency, import_status
       FROM stocks
       WHERE id = $1
       `,
@@ -208,5 +225,20 @@ export class StockImportService {
       throw new NotFoundException(`Stock ${stockId} not found`)
     }
     return rows[0]
+  }
+
+  /** Fill a placeholder company_name (still equal to the ticker) from the venue. */
+  async refreshCompanyName(stockId: string): Promise<void> {
+    const stock = await this.getStockOrThrow(stockId)
+    if (stock.company_name !== stock.symbol) return
+
+    const companyName =
+      stock.source === 'moex' ? await this.moex.fetchSecurityName(stock.symbol) : null
+    if (!companyName) return
+
+    await this.pool.query(`UPDATE stocks SET company_name = $2, updated_at = now() WHERE id = $1`, [
+      stockId,
+      companyName,
+    ])
   }
 }

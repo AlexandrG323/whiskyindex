@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { StockLogo } from '../components/comparison/StockLogo'
 import { Loader } from '../components/ui/Loader'
 import { getJson } from '../lib/api'
 
@@ -99,11 +100,7 @@ export function StocksPage({ year }: StocksPageProps) {
         <ul className="rows">
           {stocks.map((s) => (
             <li key={s.id}>
-              {s.imageUrl ? (
-                <img src={s.imageUrl} alt="" width={28} height={28} loading="lazy" />
-              ) : (
-                <span className="logo-placeholder">{s.symbol.slice(0, 2)}</span>
-              )}
+              <StockLogo symbol={s.symbol} src={s.imageUrl} size={28} />
               <span className="symbol">{s.symbol}</span>
               <span className="company">{s.companyName}</span>
               <StockPrice stock={s} />

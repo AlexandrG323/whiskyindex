@@ -55,11 +55,28 @@ export function SortIcon() {
   )
 }
 
+export function FilterIcon() {
+  return (
+    <Glyph>
+      <path d="M2.4 3.4h11.2L9.2 8.6v4l-2.4 1.2V8.6z" />
+    </Glyph>
+  )
+}
+
 export function AddIcon() {
   return (
     <Glyph>
       <path d="M8 3.2v9.6" />
       <path d="M3.2 8h9.6" />
+    </Glyph>
+  )
+}
+
+export function RemoveIcon() {
+  return (
+    <Glyph>
+      <path d="M4 4l8 8" />
+      <path d="M12 4l-8 8" />
     </Glyph>
   )
 }

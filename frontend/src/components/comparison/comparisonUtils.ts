@@ -21,7 +21,3 @@ export function stockInvestmentRange(stock: CompareStock) {
     to: Math.round(shares * stock.priceTo * 100) / 100,
   }
 }
-
-export function stockLogoUrl(stock: CompareStock) {
-  return stock.imageUrl ?? `/icons/stocks/${stock.symbol.toLowerCase()}.svg`
-}

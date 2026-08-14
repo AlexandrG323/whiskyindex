@@ -338,6 +338,9 @@ export class StockPriceRangeDto {
   @ApiProperty({ example: 'Газпром' })
   companyName!: string
 
+  @ApiProperty({ example: 'MOEX' })
+  exchange!: string
+
   @ApiPropertyOptional({ example: null, nullable: true, type: String })
   imageUrl!: string | null
 

@@ -7,6 +7,8 @@ interface IconMenuProps<T extends string> {
   options: { value: T; label: string }[]
   onChange: (value: T) => void
   align?: 'start' | 'end'
+  /** Keeps the trigger highlighted when a non-default choice is in effect. */
+  active?: boolean
 }
 
 /**
@@ -21,6 +23,7 @@ export function IconMenu<T extends string>({
   options,
   onChange,
   align = 'end',
+  active = false,
 }: IconMenuProps<T>) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -85,7 +88,10 @@ export function IconMenu<T extends string>({
   }
 
   return (
-    <div ref={rootRef} className={`icon-menu${open ? ' is-open' : ''}`}>
+    <div
+      ref={rootRef}
+      className={`icon-menu${open ? ' is-open' : ''}${active ? ' is-active' : ''}`}
+    >
       <button
         type="button"
         className="icon-btn"

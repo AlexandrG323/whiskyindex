@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { stockLogoUrl } from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
+import { StockLogo } from '../comparison/StockLogo'
 import { IconMenu } from '../ui/IconMenu'
-import { AddIcon, ResetIcon, SelectAllIcon, SortIcon } from '../ui/icons'
+import { AddIcon, FilterIcon, RemoveIcon, ResetIcon, SelectAllIcon, SortIcon } from '../ui/icons'
 
 export type StockSort = 'alpha' | 'growth'
 
@@ -11,30 +11,64 @@ const SORT_OPTIONS: { value: StockSort; label: string }[] = [
   { value: 'growth', label: 'По росту' },
 ]
 
+export const ALL_EXCHANGES = 'all'
+
 interface StockPickerProps {
   stocks: CompareStock[]
   selectedIds: Set<string>
   onToggle: (id: string) => void
   /** Clears the selection, or restores all of it when nothing is selected. */
   onReset: () => void
+  exchange: string
+  onExchangeChange: (exchange: string) => void
   /** Opens the add-custom-stock dialog. Disabled until wired up. */
   onAdd?: () => void
+  /** Ids the current browser added; those rows get a hover-only remove control. */
+  customIds?: Set<string>
+  onRemoveCustom?: (id: string) => void
 }
 
-export function StockPicker({ stocks, selectedIds, onToggle, onReset, onAdd }: StockPickerProps) {
+export function StockPicker({
+  stocks,
+  selectedIds,
+  onToggle,
+  onReset,
+  exchange,
+  onExchangeChange,
+  onAdd,
+  customIds,
+  onRemoveCustom,
+}: StockPickerProps) {
   const listRef = useRef<HTMLUListElement>(null)
   const [thumb, setThumb] = useState({ top: 0, height: 40 })
   const [sort, setSort] = useState<StockSort>('alpha')
 
-  const noneSelected = selectedIds.size === 0
+  const exchangeOptions = useMemo(() => {
+    const names = [...new Set(stocks.map((stock) => stock.exchange).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b),
+    )
+    return [
+      { value: ALL_EXCHANGES, label: 'Все биржи' },
+      ...names.map((name) => ({ value: name, label: name })),
+    ]
+  }, [stocks])
 
   const sortedStocks = useMemo(() => {
-    const copy = [...stocks]
+    const copy =
+      exchange === ALL_EXCHANGES
+        ? [...stocks]
+        : stocks.filter((stock) => stock.exchange === exchange)
     if (sort === 'growth') {
       return copy.sort((a, b) => b.growthPercent - a.growthPercent)
     }
     return copy.sort((a, b) => a.companyName.localeCompare(b.companyName, 'ru'))
-  }, [stocks, sort])
+  }, [stocks, sort, exchange])
+
+  const selectedVisibleCount = sortedStocks.reduce(
+    (count, stock) => count + (selectedIds.has(stock.id) ? 1 : 0),
+    0,
+  )
+  const noneSelected = selectedVisibleCount === 0
 
   const updateThumb = useCallback(() => {
     const el = listRef.current
@@ -98,23 +132,34 @@ export function StockPicker({ stocks, selectedIds, onToggle, onReset, onAdd }: S
   return (
     <aside className="compare-panel" aria-label="Выбор акций">
       <div className="compare-panel-header">
-        <h3>Акции для сравнения: {selectedIds.size}</h3>
+        <h3>Акции для сравнения: {selectedVisibleCount}</h3>
       </div>
 
       <div className="stock-picker-scroll">
         <ul ref={listRef} className="stock-picker" onScroll={updateThumb}>
           {sortedStocks.map((stock) => {
             const checked = selectedIds.has(stock.id)
-            const logo = stockLogoUrl(stock)
+            const isCustom = customIds?.has(stock.id) === true
             return (
               <li key={stock.id}>
                 <label className="stock-picker-item">
-                  {stock.imageUrl || logo ? (
-                    <img src={logo} alt="" width={24} height={24} loading="lazy" />
-                  ) : (
-                    <span className="stock-picker-fallback">{stock.symbol.slice(0, 2)}</span>
+                  <StockLogo symbol={stock.symbol} src={stock.imageUrl} size={24} />
+                  <span className="stock-picker-name">{stock.companyName}</span>
+                  {isCustom && onRemoveCustom && (
+                    <button
+                      type="button"
+                      className="stock-picker-remove"
+                      aria-label={`Удалить ${stock.companyName}`}
+                      title="Удалить"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onRemoveCustom(stock.id)
+                      }}
+                    >
+                      <RemoveIcon />
+                    </button>
                   )}
-                  <span>{stock.companyName}</span>
                   <input type="checkbox" checked={checked} onChange={() => onToggle(stock.id)} />
                 </label>
               </li>
@@ -153,15 +198,25 @@ export function StockPicker({ stocks, selectedIds, onToggle, onReset, onAdd }: S
           align="start"
         />
 
+        <IconMenu
+          icon={<FilterIcon />}
+          ariaLabel={exchange === ALL_EXCHANGES ? 'Фильтр по бирже' : `Биржа: ${exchange}`}
+          value={exchange}
+          options={exchangeOptions}
+          onChange={onExchangeChange}
+          align="start"
+          active={exchange !== ALL_EXCHANGES}
+        />
+
         <button
           type="button"
-          className="icon-btn"
+          className="icon-btn picker-add-btn"
           onClick={onAdd}
           disabled={!onAdd}
-          aria-label="Добавить свою акцию"
           title={onAdd ? 'Добавить свою акцию' : 'Добавить свою акцию — скоро'}
         >
           <AddIcon />
+          Добавить
         </button>
       </div>
     </aside>

@@ -509,8 +509,9 @@ section:first-child > h2:first-child {
 
 /* Only reached when a stock has no logo at all — a resolved ticker whose
    fetch failed. The curated eleven all ship one. */
-.logo-placeholder {
-  display: flex;
+.logo-placeholder,
+.stock-logo-fallback {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;
@@ -520,6 +521,21 @@ section:first-child > h2:first-child {
   color: var(--muted);
   font-size: 0.625rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Compare avatars sit on white like the real logos. */
+.stock-picker-item .stock-logo-fallback,
+.rank-card-top .stock-logo-fallback,
+.company-logo.stock-logo-fallback {
+  background: #fff;
+  color: #333;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 0;
 }
 
 .rows li + li {

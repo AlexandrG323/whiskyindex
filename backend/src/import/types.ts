@@ -27,3 +27,9 @@ export type MonthlyCandle = {
 }
 
 export type StockSource = 'moex' | 'yahoo'
+
+export type CandleFetchResult = {
+  candles: MonthlyCandle[]
+  /** Issuer name from the venue, when it sent one. */
+  companyName: string | null
+}

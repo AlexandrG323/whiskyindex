@@ -1,10 +1,12 @@
 import { PriceInfo } from './PriceInfo'
+import { StockLogo } from './StockLogo'
 import { StockTrendChart } from './StockTrendChart'
 
 interface StockCardProps {
   companyName: string
   heading?: string
-  imageUrl: string
+  symbol: string
+  imageUrl: string | null
   fromYear: number
   toYear: number
   startPrice: number
@@ -17,6 +19,7 @@ interface StockCardProps {
 export function StockCard({
   companyName,
   heading,
+  symbol,
   imageUrl,
   fromYear,
   toYear,
@@ -30,7 +33,7 @@ export function StockCard({
     <article className="comparison-card">
       <header className="stock-header">
         <h2>{heading ?? `Лучший рост: ${companyName}`}</h2>
-        <img src={imageUrl} alt={companyName} className="company-logo" />
+        <StockLogo symbol={symbol} src={imageUrl} size={36} className="company-logo" />
       </header>
 
       <div className="comparison-card-body">
