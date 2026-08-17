@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { StockLogo } from '../components/comparison/StockLogo'
 import { Loader } from '../components/ui/Loader'
-import { getJson } from '../lib/api'
+import { fetchJson, getJson } from '../lib/api'
 import type { Currency } from '../lib/currency'
+import { customStockIds, loadCustomStocks } from '../lib/customStocks'
 
 type Stock = {
   id: string
@@ -68,11 +69,37 @@ export function StocksPage({ year, currency }: StocksPageProps) {
     let cancelled = false
     setError(null)
     setLoading(true)
-    getJson<Stock[]>(`/api/v1/stocks?year=${year}&currency=${currency}`)
+
+    const custom = loadCustomStocks()
+    const extraIds = customStockIds(custom)
+    const customNames = new Map(
+      custom.flatMap((stock) => (stock.customName ? [[stock.id, stock.customName] as const] : [])),
+    )
+
+    const load = async () => {
+      const curated = await getJson<Stock[]>(
+        `/api/v1/stocks?year=${year}&currency=${currency}&curated_only=true`,
+      )
+      // Custom tickers stay in Postgres after resolve; only localStorage is the user's list.
+      if (extraIds.length === 0) return curated
+
+      const all = await fetchJson<Stock[]>(`/api/v1/stocks?year=${year}&currency=${currency}`)
+      const allowed = new Set([...curated.map((stock) => stock.id), ...extraIds])
+      return all.filter((stock) => allowed.has(stock.id))
+    }
+
+    load()
       .then((listed) => {
         if (cancelled) return
+        const named =
+          customNames.size === 0
+            ? listed
+            : listed.map((stock) => {
+                const customName = customNames.get(stock.id)
+                return customName ? { ...stock, companyName: customName } : stock
+              })
         setStocks(
-          [...listed].sort((a, b) => {
+          [...named].sort((a, b) => {
             const rank = (s: Stock) => (s.price === null ? 1 : 0)
             return rank(a) - rank(b) || a.symbol.localeCompare(b.symbol)
           }),
