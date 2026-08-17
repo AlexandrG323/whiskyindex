@@ -141,7 +141,11 @@
 /* Intro typography lives in index.css as the shared `.page-intro` pattern. */
 
 .hero-comparison-skeleton {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   min-height: 220px;
+  padding: 1rem 1.1rem;
   border-radius: var(--radius-card);
   border: 1px solid var(--border);
   background: var(--card);

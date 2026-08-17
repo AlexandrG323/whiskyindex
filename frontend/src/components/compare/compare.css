@@ -781,6 +781,7 @@
   width: 56px;
   height: 56px;
   object-fit: contain;
+  object-position: top;
 }
 
 .basket-strip-item .name {

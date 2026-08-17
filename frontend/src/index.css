@@ -322,11 +322,11 @@ section:first-child > h2:first-child {
 .loader {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   gap: 0.75rem;
-  padding: clamp(1.5rem, 5vw, 2.5rem) 1rem;
-  text-align: center;
+  padding: 0.25rem 0 1rem;
+  text-align: left;
 }
 
 .loader-bottle {
@@ -360,7 +360,7 @@ section:first-child > h2:first-child {
   position: absolute;
   inset: 0;
   z-index: 5;
-  padding: 0;
+  padding: 1rem 1.1rem;
   border-radius: var(--radius-card);
   background: rgba(11, 11, 13, 0.45);
   backdrop-filter: blur(1.5px);
@@ -431,10 +431,13 @@ section:first-child > h2:first-child {
   text-align: center;
 }
 
-/* The 72px intrinsic size would swallow a card on a narrow phone. */
+/* The 72px intrinsic size would swallow a card on a narrow phone.
+   object-position: top so squat packs sit on the same line as bottles. */
 .card img {
   width: min(72px, 45%);
-  height: auto;
+  height: 72px;
+  object-fit: contain;
+  object-position: top;
 }
 
 /* A product that did not exist yet still occupies its slot — dimmed so the
@@ -553,9 +556,14 @@ section:first-child > h2:first-child {
 .app-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  /* Header sizes to itself; leftover from the 100dvh sidebar goes to the
+     content row. `auto auto` + default align-content:stretch used to inflate
+     the header row on short pages (loading), which vertically centred the
+     loader in the viewport. */
+  grid-template-rows: auto 1fr;
   column-gap: 2rem;
   align-items: start;
+  align-content: start;
 }
 
 .app-sticky-chrome {
@@ -693,6 +701,7 @@ section:first-child > h2:first-child {
   grid-column: 2;
   grid-row: 2;
   min-width: 0;
+  align-self: start;
 }
 
 .page-body {

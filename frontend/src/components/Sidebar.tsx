@@ -59,7 +59,6 @@ export function Sidebar({ open, onClose, currency, onCurrencyChange }: SidebarPr
         </nav>
 
         <div className="currency-switcher">
-          <span className="currency-switcher-label">Валюта</span>
           <div className="currency-switcher-toggle">
             {CURRENCIES.map((option) => (
               <button
