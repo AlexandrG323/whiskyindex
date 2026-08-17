@@ -798,6 +798,16 @@ section:first-child > h2:first-child {
   .page-body {
     margin-top: 0;
   }
+
+  /* Parent `align-items: stretch` is not enough: `.app-content` keeps
+     `align-self: start` from the desktop grid (vertical, so it is harmless
+     there). In this column flex that same value is horizontal — the main
+     column shrinks to its content, the product grid collapses to one track,
+     and compare strips blow the page out sideways. */
+  .app-content {
+    align-self: stretch;
+    width: 100%;
+  }
 }
 
 @media (max-width: 560px) {
