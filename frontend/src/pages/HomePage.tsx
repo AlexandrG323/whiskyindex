@@ -4,6 +4,7 @@ import { type CompareStock, HeroComparison } from '../components/comparison/Hero
 import { SecondaryComparison } from '../components/comparison/SecondaryComparison'
 import { Loader } from '../components/ui/Loader'
 import { getJson } from '../lib/api'
+import type { Currency } from '../lib/currency'
 
 const DEFAULT_TO_YEAR = 2026
 
@@ -25,16 +26,17 @@ type StockHistoryResponse = {
   prices: { year: number; amount: number }[]
 }
 
-function stockHistoryUrl(stock: CompareStock) {
-  return `/api/v1/stocks/${stock.id}/history?from=${stock.priceFromYear}&to=${stock.priceToYear}&currency=rub`
+function stockHistoryUrl(stock: CompareStock, currency: Currency) {
+  return `/api/v1/stocks/${stock.id}/history?from=${stock.priceFromYear}&to=${stock.priceToYear}&currency=${currency}`
 }
 
 interface HomePageProps {
   year: number
   toYear?: number
+  currency: Currency
 }
 
-export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
+export function HomePage({ year, toYear = DEFAULT_TO_YEAR, currency }: HomePageProps) {
   // Compare needs a real span. Picking the end year (2026) means last year → now.
   const fromYear = Math.min(year, toYear - 1)
   const [compare, setCompare] = useState<CompareResponse | null>(null)
@@ -54,7 +56,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
     // Previous year's cards deliberately stay mounted while the new year
     // loads — clearing them here collapsed the page and shoved the intro down.
 
-    const compareUrl = `/api/v1/analytics/compare?from=${fromYear}&to=${toYear}&currency=rub`
+    const compareUrl = `/api/v1/analytics/compare?from=${fromYear}&to=${toYear}&currency=${currency}`
 
     getJson<CompareResponse>(compareUrl)
       .then(async (data) => {
@@ -72,8 +74,8 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
         setWorstStock(worst)
 
         const [heroHistory, worstHistory] = await Promise.all([
-          getJson<StockHistoryResponse>(stockHistoryUrl(best)),
-          getJson<StockHistoryResponse>(stockHistoryUrl(worst)),
+          getJson<StockHistoryResponse>(stockHistoryUrl(best, currency)),
+          getJson<StockHistoryResponse>(stockHistoryUrl(worst, currency)),
         ])
         if (!cancelled) {
           setHistoryPrices(heroHistory.prices)
@@ -97,7 +99,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR }: HomePageProps) {
     return () => {
       cancelled = true
     }
-  }, [fromYear, toYear])
+  }, [fromYear, toYear, currency])
 
   return (
     <div className={loading ? 'is-loading' : undefined}>

@@ -1,12 +1,15 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../components/Sidebar'
+import type { Currency } from '../lib/currency'
 
 interface AppLayoutProps {
   header: ReactNode
+  currency: Currency
+  onCurrencyChange: (currency: Currency) => void
 }
 
-export function AppLayout({ header }: AppLayoutProps) {
+export function AppLayout({ header, currency, onCurrencyChange }: AppLayoutProps) {
   const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
@@ -44,7 +47,12 @@ export function AppLayout({ header }: AppLayoutProps) {
   return (
     <div className="app-layout">
       <div className="app-sticky-chrome">
-        <Sidebar open={menuOpen} onClose={closeMenu} />
+        <Sidebar
+          open={menuOpen}
+          onClose={closeMenu}
+          currency={currency}
+          onCurrencyChange={onCurrencyChange}
+        />
         <div className="app-sticky-header">
           <div className="app-topbar">
             <button

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
+import type { Currency } from '../lib/currency'
 
 const LINKS = [
   { to: '/', label: 'Главная', end: true },
@@ -9,12 +10,19 @@ const LINKS = [
   { to: '/about', label: 'О проекте' },
 ]
 
+const CURRENCIES: { value: Currency; label: string }[] = [
+  { value: 'rub', label: '₽ RUB' },
+  { value: 'usd', label: '$ USD' },
+]
+
 interface SidebarProps {
   open: boolean
   onClose: () => void
+  currency: Currency
+  onCurrencyChange: (currency: Currency) => void
 }
 
-export function Sidebar({ open, onClose }: SidebarProps) {
+export function Sidebar({ open, onClose, currency, onCurrencyChange }: SidebarProps) {
   const navRef = useRef<HTMLElement>(null)
 
   // Only fires in drawer mode — on desktop the sidebar is a rail and `open`
@@ -49,6 +57,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </NavLink>
           ))}
         </nav>
+
+        <div className="currency-switcher">
+          <span className="currency-switcher-label">Валюта</span>
+          <div className="currency-switcher-toggle">
+            {CURRENCIES.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={currency === option.value}
+                className={currency === option.value ? 'is-active' : undefined}
+                onClick={() => onCurrencyChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </aside>
     </>
   )

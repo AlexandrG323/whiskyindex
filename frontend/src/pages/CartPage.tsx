@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader } from '../components/ui/Loader'
 import { getJson } from '../lib/api'
+import type { Currency } from '../lib/currency'
 
 type CartProduct = {
   id: string
@@ -24,9 +25,10 @@ function money(amount: number, currency: 'RUB' | 'USD') {
 
 interface CartPageProps {
   year: number
+  currency: Currency
 }
 
-export function CartPage({ year }: CartPageProps) {
+export function CartPage({ year, currency }: CartPageProps) {
   const [products, setProducts] = useState<CartProduct[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,7 +37,7 @@ export function CartPage({ year }: CartPageProps) {
     let cancelled = false
     setError(null)
     setLoading(true)
-    getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}`)
+    getJson<CartProduct[]>(`/api/v1/products/cart?year=${year}&currency=${currency}`)
       .then((cart) => {
         if (!cancelled) setProducts(cart)
       })
@@ -48,7 +50,7 @@ export function CartPage({ year }: CartPageProps) {
     return () => {
       cancelled = true
     }
-  }, [year])
+  }, [year, currency])
 
   const available = products.filter((p) => p.price !== null)
   const cartTotal = available.reduce((sum, p) => sum + (p.price ?? 0), 0)

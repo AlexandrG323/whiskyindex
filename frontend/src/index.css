@@ -572,12 +572,13 @@ section:first-child > h2:first-child {
   position: sticky;
   top: 0;
   align-self: start;
+  min-height: 100dvh;
   max-height: 100dvh;
   overflow-y: auto;
   z-index: 30;
   margin-top: calc(-1 * var(--page-pad));
   padding-top: var(--page-pad);
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
   background: var(--bg);
   scrollbar-width: thin;
 }
@@ -635,6 +636,57 @@ section:first-child > h2:first-child {
   background: var(--card);
   color: var(--accent);
   border: 1px solid var(--border);
+}
+
+.currency-switcher {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.currency-switcher-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0 0.875rem;
+}
+
+.currency-switcher-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.currency-switcher-toggle button {
+  min-height: var(--tap);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.currency-switcher-toggle button:hover {
+  color: var(--text);
+}
+
+.currency-switcher-toggle button.is-active {
+  background: rgba(233, 146, 46, 0.12);
+  color: var(--accent);
 }
 
 .app-content {

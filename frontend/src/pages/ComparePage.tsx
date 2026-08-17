@@ -12,6 +12,7 @@ import type { CompareStock } from '../components/comparison/HeroComparison'
 import { Loader } from '../components/ui/Loader'
 import { Select } from '../components/ui/Select'
 import { getJson, postJson } from '../lib/api'
+import type { Currency } from '../lib/currency'
 import {
   type CustomStock,
   customStockIds,
@@ -115,7 +116,11 @@ function money(amount: number, currency: 'RUB' | 'USD') {
   }).format(amount)
 }
 
-export function ComparePage() {
+interface ComparePageProps {
+  currency: Currency
+}
+
+export function ComparePage({ currency }: ComparePageProps) {
   const [from, setFrom] = useState(DEFAULT_FROM)
   const [to, setTo] = useState(DEFAULT_TO)
 
@@ -173,10 +178,10 @@ export function ComparePage() {
     setError(null)
 
     const compareUrlPromise = (async () => {
-      const base = `/api/v1/analytics/compare?from=${from}&to=${to}&currency=rub`
+      const base = `/api/v1/analytics/compare?from=${from}&to=${to}&currency=${currency}`
       if (!customIdsKey) return base
       const curated = await getJson<{ id: string }[]>(
-        `/api/v1/stocks?year=${to}&currency=rub&curated_only=true`,
+        `/api/v1/stocks?year=${to}&currency=${currency}&curated_only=true`,
       )
       const ids = [...new Set([...curated.map((s) => s.id), ...customIdsKey.split(',')])]
       return `${base}&stockIds=${ids.join(',')}`
@@ -184,8 +189,8 @@ export function ComparePage() {
 
     Promise.all([
       compareUrlPromise.then((url) => getJson<CompareResponse>(url)),
-      getJson<CartProduct[]>(`/api/v1/products/cart?year=${from}`),
-      getJson<CartProduct[]>(`/api/v1/products/cart?year=${to}`),
+      getJson<CartProduct[]>(`/api/v1/products/cart?year=${from}&currency=${currency}`),
+      getJson<CartProduct[]>(`/api/v1/products/cart?year=${to}&currency=${currency}`),
     ])
       .then(async ([data, cartFrom, cartTo]) => {
         if (cancelled) return
@@ -217,7 +222,7 @@ export function ComparePage() {
           ids: data.stocks.map((s) => s.id),
           from,
           to,
-          currency: 'rub',
+          currency,
         })
         if (!cancelled) setHistories(batch)
       })
@@ -236,7 +241,7 @@ export function ComparePage() {
     return () => {
       cancelled = true
     }
-  }, [from, to, customIdsKey])
+  }, [from, to, customIdsKey, currency])
 
   const displayStocks = useMemo(() => {
     if (!compare) return []

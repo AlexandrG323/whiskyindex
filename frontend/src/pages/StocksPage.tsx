@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { StockLogo } from '../components/comparison/StockLogo'
 import { Loader } from '../components/ui/Loader'
 import { getJson } from '../lib/api'
+import type { Currency } from '../lib/currency'
 
 type Stock = {
   id: string
@@ -55,9 +56,10 @@ function StockPrice({ stock }: { stock: Stock }) {
 
 interface StocksPageProps {
   year: number
+  currency: Currency
 }
 
-export function StocksPage({ year }: StocksPageProps) {
+export function StocksPage({ year, currency }: StocksPageProps) {
   const [stocks, setStocks] = useState<Stock[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,7 @@ export function StocksPage({ year }: StocksPageProps) {
     let cancelled = false
     setError(null)
     setLoading(true)
-    getJson<Stock[]>(`/api/v1/stocks?year=${year}`)
+    getJson<Stock[]>(`/api/v1/stocks?year=${year}&currency=${currency}`)
       .then((listed) => {
         if (cancelled) return
         setStocks(
@@ -85,7 +87,7 @@ export function StocksPage({ year }: StocksPageProps) {
     return () => {
       cancelled = true
     }
-  }, [year])
+  }, [year, currency])
 
   return (
     <div className={loading ? 'is-loading' : undefined}>

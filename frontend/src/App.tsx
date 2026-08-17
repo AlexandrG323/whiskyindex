@@ -3,6 +3,7 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import { Select } from './components/ui/Select'
 import { AppLayout } from './layout/AppLayout'
 import { getJson } from './lib/api'
+import { type Currency, loadCurrency, saveCurrency } from './lib/currency'
 import { AboutPage } from './pages/AboutPage'
 import { CartPage } from './pages/CartPage'
 import { ComparePage } from './pages/ComparePage'
@@ -20,7 +21,13 @@ export default function App() {
   const showHeaderYear = pathname !== '/compare'
 
   const [year, setYear] = useState(DEFAULT_YEAR)
+  const [currency, setCurrencyState] = useState<Currency>(loadCurrency)
   const [exchangeRate, setExchangeRate] = useState<number | null>(null)
+
+  const setCurrency = (next: Currency) => {
+    setCurrencyState(next)
+    saveCurrency(next)
+  }
 
   useEffect(() => {
     if (!showHeaderYear) return
@@ -63,11 +70,13 @@ export default function App() {
 
   return (
     <Routes>
-      <Route element={<AppLayout header={header} />}>
-        <Route path="/" element={<HomePage year={year} toYear={MAX_YEAR} />} />
-        <Route path="/cart" element={<CartPage year={year} />} />
-        <Route path="/stocks" element={<StocksPage year={year} />} />
-        <Route path="/compare" element={<ComparePage />} />
+      <Route
+        element={<AppLayout header={header} currency={currency} onCurrencyChange={setCurrency} />}
+      >
+        <Route path="/" element={<HomePage year={year} toYear={MAX_YEAR} currency={currency} />} />
+        <Route path="/cart" element={<CartPage year={year} currency={currency} />} />
+        <Route path="/stocks" element={<StocksPage year={year} currency={currency} />} />
+        <Route path="/compare" element={<ComparePage currency={currency} />} />
         <Route path="/about" element={<AboutPage />} />
       </Route>
     </Routes>
