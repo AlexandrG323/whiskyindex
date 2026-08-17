@@ -13,6 +13,9 @@ npm run dev
 Откроется на `http://localhost:5173`. Запросы к `/api/*` проксируются на backend
 (`http://localhost:3000`) — см. `vite.config.ts`.
 
+Прод (Vercel): тот же относительный `/api`; rewrite на Fly задан в `vercel.json`.
+Root Directory проекта — `frontend`, output — `dist`. Подробности в корневом `README.md`.
+
 ## Домашка
 
 См. [HOMEWORK.md](./HOMEWORK.md) — левая панель навигации + пустые страницы через React Router.

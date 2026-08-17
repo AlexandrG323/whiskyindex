@@ -95,6 +95,27 @@ npm run dev              # http://localhost:5173
 
 Подробности — в `frontend/README.md` и `backend/README.md`.
 
+## Frontend (Vercel)
+
+Прод UI — статическая Vite-сборка на Vercel. API остаётся на Fly:
+**https://whiskyindex.fly.dev**. Браузер ходит на относительные `/api/...`
+(как локально); Vercel проксирует их на Fly — см. `frontend/vercel.json`.
+То же касается логотипов резолвленных тикеров (`/api/v1/stocks/:id/logo`).
+
+Настройки проекта:
+
+- **Root Directory:** `frontend`
+- **Framework:** Vite
+- **Build command:** `npm run build` (`tsc && vite build`)
+- **Output:** `dist`
+- **Env vars:** не нужны (хост API зашит в rewrite)
+
+Локально прокси не меняется: Vite `server.proxy` в `frontend/vite.config.ts`.
+
+Первый запрос к `/api/v1/stocks` может импортировать цены (MOEX/Yahoo) и
+упереться в таймаут Hobby-прокси, если машина Fly ещё спит. Повтор после
+прогрева — обычный read из БД.
+
 ## Lint & hooks
 
 После `npm install` из корня Husky включает hooks автоматически (`prepare`).
