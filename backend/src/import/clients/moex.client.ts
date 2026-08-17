@@ -130,7 +130,7 @@ export class MoexClient {
 
     this.logger.log(`Fetched ${candles.length} monthly candles from MOEX for ${symbol}`)
     const companyName = await this.fetchSecurityName(symbol)
-    return { candles, companyName }
+    return { candles, companyName, currency: 'RUB' }
   }
 
   /**

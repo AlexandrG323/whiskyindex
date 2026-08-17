@@ -4,6 +4,7 @@ import { MAX_YEAR, MIN_YEAR } from '../common/years'
 import { PG_POOL } from '../database/database.constants'
 import { MoexClient } from './clients/moex.client'
 import { YahooClient } from './clients/yahoo.client'
+import { isoCurrency, normalizeListingCurrency } from './listing-currency'
 import type { MonthlyCandle, YearlyAveragePrice } from './types'
 
 type StockRow = {
@@ -11,7 +12,7 @@ type StockRow = {
   symbol: string
   company_name: string
   source: 'moex' | 'yahoo'
-  native_currency: 'RUB' | 'USD'
+  native_currency: string
   import_status: string
 }
 
@@ -69,14 +70,24 @@ export class StockImportService {
     try {
       let candles: MonthlyCandle[] = []
       let companyName: string | null = null
+      let nativeCurrency = isoCurrency(stock.native_currency)
+
       if (stock.source === 'moex') {
         const fetched = await this.moex.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
         candles = fetched.candles
         companyName = fetched.companyName
+        nativeCurrency = 'RUB'
       } else {
         const fetched = await this.yahoo.fetchMonthlyCandles(stock.symbol, fromYear, toYear)
         candles = fetched.candles
         companyName = fetched.companyName
+        const listing = normalizeListingCurrency(fetched.currency)
+        if (listing) {
+          nativeCurrency = listing.code
+          if (listing.scale !== 1) {
+            candles = scaleCandles(candles, listing.scale)
+          }
+        }
       }
 
       if (companyName && stock.company_name === stock.symbol) {
@@ -86,13 +97,24 @@ export class StockImportService {
         )
       }
 
-      const yearlyPrices = this.averageByYear(candles, stock.native_currency)
+      if (nativeCurrency !== isoCurrency(stock.native_currency)) {
+        await this.pool.query(
+          `UPDATE stocks SET native_currency = $2, updated_at = now() WHERE id = $1`,
+          [stockId, nativeCurrency],
+        )
+      }
+
+      const yearlyPrices = this.averageByYear(candles, nativeCurrency)
 
       if (candles.length === 0 || yearlyPrices.length === 0) {
         throw new Error(`No price data for ${stock.symbol} (${stock.source})`)
       }
 
       await this.persistYearlyPrices(stockId, yearlyPrices)
+
+      if (nativeCurrency !== 'USD' && nativeCurrency !== 'RUB') {
+        await this.persistNativeUsdRates(nativeCurrency, fromYear, toYear)
+      }
 
       await this.pool.query(
         `UPDATE stocks SET import_status = 'ready', prices_cached_at = now(), updated_at = now() WHERE id = $1`,
@@ -119,7 +141,7 @@ export class StockImportService {
    * Пример:
    *   candles за 2020: 12 месяцев → один YearlyAveragePrice { year: 2020, averagePrice, currency }
    */
-  averageByYear(candles: MonthlyCandle[], currency: 'RUB' | 'USD'): YearlyAveragePrice[] {
+  averageByYear(candles: MonthlyCandle[], currency: string): YearlyAveragePrice[] {
     if (candles.length === 0) return []
 
     const yearlyMap = new Map<number, { price: number[]; total: number[] }>()
@@ -211,6 +233,69 @@ export class StockImportService {
     }
   }
 
+  /**
+   * Yearly USD per 1 native unit, from Yahoo FX pairs.
+   * Tries CCYUSD=X first; falls back to USDCCY=X inverted.
+   * Failure is logged, not thrown — native prices are still valid.
+   */
+  async persistNativeUsdRates(
+    nativeCurrency: string,
+    fromYear: number,
+    toYear: number,
+  ): Promise<void> {
+    const code = isoCurrency(nativeCurrency)
+    if (code === 'USD' || code === 'RUB') return
+
+    try {
+      let yearly: YearlyAveragePrice[] = []
+      let inverted = false
+
+      try {
+        const direct = await this.yahoo.fetchMonthlyCandles(`${code}USD=X`, fromYear, toYear)
+        yearly = this.averageByYear(direct.candles, 'USD')
+      } catch (err: unknown) {
+        this.logger.warn(
+          `${code}USD=X unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
+
+      if (yearly.length === 0) {
+        try {
+          const quote = await this.yahoo.fetchMonthlyCandles(`USD${code}=X`, fromYear, toYear)
+          yearly = this.averageByYear(quote.candles, code)
+          inverted = true
+        } catch (err: unknown) {
+          this.logger.warn(
+            `USD${code}=X unavailable: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
+      }
+
+      if (yearly.length === 0) {
+        this.logger.warn(`No Yahoo FX candles for ${code}→USD`)
+        return
+      }
+
+      for (const item of yearly) {
+        const rate = inverted ? 1 / item.averagePrice : item.averagePrice
+        if (!Number.isFinite(rate) || rate <= 0) continue
+        await this.pool.query(
+          `
+          INSERT INTO exchange_rates (year, base_currency, quote_currency, rate, source)
+          VALUES ($1, $2, 'USD', $3, 'yahoo')
+          ON CONFLICT (year, base_currency, quote_currency) DO UPDATE SET
+            rate = EXCLUDED.rate,
+            source = EXCLUDED.source
+          `,
+          [item.year, code, Number(rate.toFixed(8))],
+        )
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      this.logger.warn(`FX import failed for ${code}→USD: ${errorMessage}`)
+    }
+  }
+
   /** Утилита: прочитать акцию (пригодится в importStockById). */
   async getStockOrThrow(stockId: string): Promise<StockRow> {
     const { rows } = await this.pool.query<StockRow>(
@@ -227,6 +312,30 @@ export class StockImportService {
     return rows[0]
   }
 
+  /**
+   * Cheap availability check: fetch candles with no DB writes.
+   * Uses the same year range as import so delisted names (AVAZ) still match.
+   */
+  async probeSymbol(
+    symbol: string,
+    source: 'moex' | 'yahoo',
+  ): Promise<{ available: boolean; companyName: string | null }> {
+    try {
+      const fetched =
+        source === 'moex'
+          ? await this.moex.fetchMonthlyCandles(symbol, MIN_YEAR, MAX_YEAR)
+          : await this.yahoo.fetchMonthlyCandles(symbol, MIN_YEAR, MAX_YEAR)
+      return {
+        available: fetched.candles.length > 0,
+        companyName: fetched.companyName,
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      this.logger.warn(`Probe failed for ${symbol} (${source}): ${errorMessage}`)
+      return { available: false, companyName: null }
+    }
+  }
+
   /** Fill a placeholder company_name (still equal to the ticker) from the venue. */
   async refreshCompanyName(stockId: string): Promise<void> {
     const stock = await this.getStockOrThrow(stockId)
@@ -241,4 +350,16 @@ export class StockImportService {
       companyName,
     ])
   }
+}
+
+function scaleCandles(candles: MonthlyCandle[], scale: number): MonthlyCandle[] {
+  if (scale === 1) return candles
+  return candles.map((candle) => ({
+    ...candle,
+    open: candle.open / scale,
+    high: candle.high / scale,
+    low: candle.low / scale,
+    close: candle.close / scale,
+    adjClose: candle.adjClose === undefined ? undefined : candle.adjClose / scale,
+  }))
 }

@@ -27,10 +27,26 @@ function remember<T>(key: string, run: () => Promise<T>): Promise<T> {
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
-  if (!res.ok) {
-    throw new Error(`${url} → ${res.status} ${res.statusText}`)
+  const text = await res.text()
+  let data: unknown = null
+  if (text) {
+    try {
+      data = JSON.parse(text) as unknown
+    } catch {
+      data = null
+    }
   }
-  return (await res.json()) as T
+  if (!res.ok) {
+    const message =
+      data &&
+      typeof data === 'object' &&
+      'message' in data &&
+      typeof (data as { message: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : `${url} → ${res.status} ${res.statusText}`
+    throw new Error(message)
+  }
+  return data as T
 }
 
 export function getJson<T>(url: string): Promise<T> {

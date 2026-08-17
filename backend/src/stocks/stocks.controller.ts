@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
   Post,
@@ -23,22 +25,28 @@ import type { Response } from 'express'
 import { MAX_YEAR, MIN_YEAR, parseYear } from '../common/years'
 import {
   ResolveStockDto,
+  ResolveStockQueryDto,
+  ResolveStockQueryResponseDto,
   ResolveStockResponseDto,
   StockDetailDto,
   StockHistoryDto,
   StocksBatchHistoryRequestDto,
   StockYearlyPriceDto,
 } from '../dto/common.dto'
+import { StockQueryService } from './stock-query.service'
 import { StocksService } from './stocks.service'
 
 /**
  * Stocks API (SPEC.md → /api/v1/stocks/...).
- * Порядок роутов важен: сначала статичные пути (resolve, history), потом :id.
+ * Порядок роутов важен: сначала статичные пути (resolve, resolve-query, history), потом :id.
  */
 @ApiTags('stocks')
 @Controller('v1/stocks')
 export class StocksController {
-  constructor(private readonly stocksService: StocksService) {}
+  constructor(
+    private readonly stocksService: StocksService,
+    private readonly stockQuery: StockQueryService,
+  ) {}
 
   /**
    * GET /api/v1/stocks?year=&currency=&curated_only=
@@ -92,6 +100,23 @@ export class StocksController {
   @ApiAcceptedResponse({ type: ResolveStockResponseDto })
   resolve(@Body() body: ResolveStockDto): Promise<ResolveStockResponseDto> {
     return this.stocksService.resolve(body)
+  }
+
+  /**
+   * POST /api/v1/stocks/resolve-query
+   * Free-form description → ranked ticker candidates → first listing with quotes.
+   */
+  @Post('resolve-query')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Разрешить акцию по свободному описанию',
+    description:
+      'LLM возвращает кандидатов с вероятностью; котировки проверяются без записи неудачных тикеров.',
+  })
+  @ApiBody({ type: ResolveStockQueryDto })
+  @ApiOkResponse({ type: ResolveStockQueryResponseDto })
+  resolveQuery(@Body() body: ResolveStockQueryDto): Promise<ResolveStockQueryResponseDto> {
+    return this.stockQuery.resolveQuery(body)
   }
 
   /**

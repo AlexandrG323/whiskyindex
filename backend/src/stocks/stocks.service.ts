@@ -18,6 +18,7 @@ import type {
   StockYearlyPriceDto,
 } from '../dto/common.dto'
 import { StockImportService } from '../import/stock-import.service'
+import { convertToDisplay, currenciesNeedingUsdPair } from './fx-display'
 import { StockLogoService, type StoredLogo } from './stock-logo.service'
 
 type StockYearRow = {
@@ -27,7 +28,7 @@ type StockYearRow = {
   country: string
   exchange: string
   source: string
-  native_currency: 'RUB' | 'USD'
+  native_currency: string
   import_status: 'pending' | 'importing' | 'ready' | 'failed'
   image_url: string | null
   prices_cached_at: Date | null
@@ -134,35 +135,39 @@ export class StocksService {
       stocks = await this.queryStocksForYear(whereClause, year)
     }
 
-    const { rows: rateRows } = await this.pool.query(
-      `
-      SELECT year, rate
-      FROM exchange_rates
-      WHERE year = $1
-        AND base_currency = 'USD'
-        AND quote_currency = 'RUB'
-      `,
-      [year],
+    const usdRubByYear = await this.loadUsdRubRates(year, year)
+    const nativeUsdByCcyYear = await this.loadNativeUsdRates(
+      currenciesNeedingUsdPair(
+        stocks.map((row) => row.native_currency),
+        displayCurrency,
+      ),
+      year,
+      year,
     )
-
-    // null, not 1. Falling back to a rate of 1 silently reports a USD price as
-    // if it were rubles — which is exactly what happened for 1998-2006 before
-    // those years were seeded: Apple's 1998 price rendered as 0 RUB instead of
-    // roughly 2.6. A missing rate now yields no price rather than a wrong one.
-    const fxRate = rateRows.length > 0 ? Number(rateRows[0].rate) : null
 
     return stocks.map((row) => {
       const resolved = resolveYearPrice(row, year)
       let amount = resolved.price
       let status = resolved.status
+      const nativeCurrency = row.native_currency.trim()
 
-      if (amount !== null && row.native_currency !== displayCurrency) {
-        if (fxRate === null) {
-          this.logger.warn(`No USD/RUB rate for ${year}; cannot price ${row.symbol}`)
+      if (amount !== null && nativeCurrency !== displayCurrency) {
+        const converted = convertToDisplay(
+          amount,
+          nativeCurrency,
+          displayCurrency,
+          year,
+          usdRubByYear,
+          nativeUsdByCcyYear,
+        )
+        if (converted === null) {
+          this.logger.warn(
+            `No FX to ${displayCurrency} for ${row.symbol} (${nativeCurrency}) in ${year}`,
+          )
           amount = null
           status = 'unavailable'
         } else {
-          amount = row.native_currency === 'USD' ? amount * fxRate : amount / fxRate
+          amount = converted
         }
       }
 
@@ -173,7 +178,7 @@ export class StocksService {
         country: row.country,
         exchange: row.exchange,
         source: row.source,
-        nativeCurrency: row.native_currency,
+        nativeCurrency,
         displayCurrency,
 
         importStatus: row.import_status,
@@ -275,7 +280,7 @@ export class StocksService {
       companyName: row.company_name,
       imageUrl: row.image_url,
       exchange: row.exchange,
-      nativeCurrency: row.native_currency,
+      nativeCurrency: String(row.native_currency).trim(),
       importStatus: row.import_status,
       coverage:
         row.coverage_from === null || row.coverage_to === null
@@ -349,18 +354,28 @@ export class StocksService {
       )
     }
 
-    const nativeCurrency = rows[0].native_currency as 'RUB' | 'USD'
-    const priceFrom = await this.toDisplayAmount(
+    const nativeCurrency = rows[0].native_currency.trim()
+    const usdRubByYear = await this.loadUsdRubRates(fromPoint.year, toPoint.year)
+    const nativeUsdByCcyYear = await this.loadNativeUsdRates(
+      currenciesNeedingUsdPair([nativeCurrency], displayCurrency),
+      fromPoint.year,
+      toPoint.year,
+    )
+    const priceFrom = this.requireDisplayAmount(
       fromPoint.nativeAmount,
       nativeCurrency,
       displayCurrency,
       fromPoint.year,
+      usdRubByYear,
+      nativeUsdByCcyYear,
     )
-    const priceTo = await this.toDisplayAmount(
+    const priceTo = this.requireDisplayAmount(
       toPoint.nativeAmount,
       nativeCurrency,
       displayCurrency,
       toPoint.year,
+      usdRubByYear,
+      nativeUsdByCcyYear,
     )
 
     const statusRow = await this.pool.query<{
@@ -455,31 +470,77 @@ export class StocksService {
     throw new RequestTimeoutException(`Timed out waiting for stock "${id}" import to finish`)
   }
 
-  private async toDisplayAmount(
+  private requireDisplayAmount(
     nativeAmount: number,
-    nativeCurrency: 'RUB' | 'USD',
+    nativeCurrency: string,
     displayCurrency: 'RUB' | 'USD',
     year: number,
-  ): Promise<number> {
-    if (nativeCurrency === displayCurrency) {
-      return nativeAmount
+    usdRubByYear: Map<number, number>,
+    nativeUsdByCcyYear: Map<string, Map<number, number>>,
+  ): number {
+    const converted = convertToDisplay(
+      nativeAmount,
+      nativeCurrency,
+      displayCurrency,
+      year,
+      usdRubByYear,
+      nativeUsdByCcyYear,
+    )
+    if (converted === null) {
+      throw new NotFoundException(
+        `Exchange rate for ${nativeCurrency}→${displayCurrency} in ${year} not found`,
+      )
     }
+    return converted
+  }
 
-    const { rows } = await this.pool.query<{ rate: string }>(
+  private async loadUsdRubRates(from: number, to: number): Promise<Map<number, number>> {
+    const { rows } = await this.pool.query<{ year: number; rate: string }>(
       `
-        SELECT rate
+        SELECT year, rate
         FROM exchange_rates
-        WHERE year = $1
+        WHERE year BETWEEN $1 AND $2
           AND base_currency = 'USD'
           AND quote_currency = 'RUB'
       `,
-      [year],
+      [from, to],
     )
-    if (rows.length === 0) {
-      throw new NotFoundException(`Exchange rate for ${year} not found`)
+    return new Map(rows.map((row) => [Number(row.year), Number(row.rate)]))
+  }
+
+  private async loadNativeUsdRates(
+    codes: string[],
+    from: number,
+    to: number,
+  ): Promise<Map<string, Map<number, number>>> {
+    const byCcy = new Map<string, Map<number, number>>()
+    if (codes.length === 0) return byCcy
+
+    const { rows } = await this.pool.query<{
+      year: number
+      base_currency: string
+      rate: string
+    }>(
+      `
+        SELECT year, base_currency, rate
+        FROM exchange_rates
+        WHERE year BETWEEN $1 AND $2
+          AND quote_currency = 'USD'
+          AND TRIM(base_currency) = ANY($3::text[])
+      `,
+      [from, to, codes],
+    )
+
+    for (const row of rows) {
+      const code = row.base_currency.trim()
+      let years = byCcy.get(code)
+      if (!years) {
+        years = new Map()
+        byCcy.set(code, years)
+      }
+      years.set(Number(row.year), Number(row.rate))
     }
-    const rate = Number(rows[0].rate)
-    return nativeCurrency === 'USD' ? nativeAmount * rate : nativeAmount / rate
+    return byCcy
   }
 
   async getHistory(
@@ -551,52 +612,48 @@ export class StocksService {
     }
 
     const [firstRow] = rows
+    const nativeCurrency = String(firstRow.native_currency).trim()
+    const usdRubByYear = await this.loadUsdRubRates(from, to)
+    const nativeUsdByCcyYear = await this.loadNativeUsdRates(
+      currenciesNeedingUsdPair([nativeCurrency], displayCurrency),
+      from,
+      to,
+    )
 
-    let exchangeRates = new Map<number, number>()
-
-    if (firstRow.native_currency !== displayCurrency) {
-      const { rows: rateRows } = await this.pool.query(
-        `
-          SELECT year, rate
-          FROM exchange_rates
-          WHERE year BETWEEN $1 AND $2
-            AND base_currency = 'USD'
-            AND quote_currency = 'RUB'
-        `,
-        [from, to],
+    const prices = rows.flatMap((row) => {
+      const year = Number(row.year)
+      const nativeAmount = Number(row.average_price)
+      const amount = convertToDisplay(
+        nativeAmount,
+        nativeCurrency,
+        displayCurrency,
+        year,
+        usdRubByYear,
+        nativeUsdByCcyYear,
       )
+      if (amount === null) {
+        this.logger.warn(
+          `No FX to ${displayCurrency} for ${firstRow.symbol} (${nativeCurrency}) in ${year}`,
+        )
+        return []
+      }
+      return [{ year, nativeAmount, amount }]
+    })
 
-      exchangeRates = new Map(rateRows.map((row) => [Number(row.year), Number(row.rate)]))
+    if (prices.length === 0) {
+      throw new NotFoundException(
+        `No ${displayCurrency} history for stock "${id}" between ${from}-${to}.`,
+      )
     }
 
     return {
       id: firstRow.id,
       symbol: firstRow.symbol,
       imageUrl: firstRow.image_url,
-      nativeCurrency: firstRow.native_currency,
+      nativeCurrency,
       displayCurrency,
       importStatus: firstRow.import_status,
-      prices: rows.map((row) => {
-        const nativeAmount = Number(row.average_price)
-
-        let amount = nativeAmount
-
-        if (row.native_currency !== displayCurrency) {
-          const rate = exchangeRates.get(Number(row.year))
-
-          if (!rate) {
-            throw new NotFoundException(`Exchange rate for ${row.year} not found`)
-          }
-
-          amount = row.native_currency === 'USD' ? nativeAmount * rate : nativeAmount / rate
-        }
-
-        return {
-          year: Number(row.year),
-          nativeAmount,
-          amount,
-        }
-      }),
+      prices,
     }
   }
 

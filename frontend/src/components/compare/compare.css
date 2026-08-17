@@ -998,7 +998,7 @@
 }
 
 .stock-dialog {
-  width: min(100%, 22.5rem);
+  width: min(100%, 26rem);
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -1007,6 +1007,51 @@
   border-radius: var(--radius-card);
   background: linear-gradient(145deg, #1e2128 0%, #16181d 100%);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+}
+
+.stock-dialog-mode {
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+  border: 0;
+}
+
+.stock-dialog-mode-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.stock-dialog-mode-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.stock-dialog-mode-buttons button {
+  min-height: 2.1rem;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.stock-dialog-mode-buttons button[aria-pressed="true"] {
+  background: rgba(233, 146, 46, 0.16);
+  color: var(--accent);
+}
+
+.stock-dialog-mode:disabled button {
+  cursor: default;
 }
 
 .stock-dialog h3 {
@@ -1055,7 +1100,8 @@
   letter-spacing: 0.04em;
 }
 
-.stock-dialog-field input[name="customName"] {
+.stock-dialog-field input[name="customName"],
+.stock-dialog-field input[name="query"] {
   letter-spacing: normal;
 }
 
@@ -1102,11 +1148,43 @@
   color: var(--accent);
 }
 
+.stock-dialog-status {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .stock-dialog-error {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.4;
   color: #f0503c;
+}
+
+.stock-dialog-candidates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.stock-dialog-candidates li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.stock-dialog-candidates li[data-available="yes"] {
+  color: var(--text);
+}
+
+.stock-dialog-candidates li[data-available="no"] {
+  opacity: 0.65;
 }
 
 .stock-dialog-actions {

@@ -104,8 +104,8 @@ export class StockYearlyPriceDto {
   @ApiPropertyOptional({ example: null, nullable: true, type: String })
   imageUrl!: string | null
 
-  @ApiProperty({ example: 'USD', enum: ['RUB', 'USD'] })
-  nativeCurrency!: 'RUB' | 'USD'
+  @ApiProperty({ example: 'MNT' })
+  nativeCurrency!: string
 
   @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
   displayCurrency!: 'RUB' | 'USD'
@@ -179,8 +179,8 @@ export class StockDetailDto {
   @ApiProperty({ example: 'NASDAQ' })
   exchange!: string
 
-  @ApiProperty({ example: 'USD', enum: ['RUB', 'USD'] })
-  nativeCurrency!: 'RUB' | 'USD'
+  @ApiProperty({ example: 'MNT' })
+  nativeCurrency!: string
 
   @ApiProperty({
     example: 'ready',
@@ -199,6 +199,80 @@ export class ResolveStockDto {
 
   @ApiProperty({ example: 'NASDAQ' })
   exchange!: string
+}
+
+export class ResolveStockQueryDto {
+  @ApiProperty({ example: 'автоваз', maxLength: 200 })
+  query!: string
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['SBER|MOEX'],
+    description: 'Listings already in the picker, as SYMBOL|EXCHANGE',
+  })
+  exclude?: string[]
+}
+
+export class StockQueryCandidateDto {
+  @ApiProperty({ example: 'AVAZ' })
+  symbol!: string
+
+  @ApiProperty({ example: 'MOEX' })
+  exchange!: string
+
+  @ApiProperty({ example: 'АвтоВАЗ' })
+  companyName!: string
+
+  @ApiProperty({ example: 0.92, minimum: 0, maximum: 1 })
+  confidence!: number
+
+  @ApiProperty({ example: 'Russian carmaker historically listed on MOEX' })
+  reason!: string
+}
+
+export class StockQueryTriedDto {
+  @ApiProperty({ example: 'AVAZ' })
+  symbol!: string
+
+  @ApiProperty({ example: 'MOEX' })
+  exchange!: string
+
+  @ApiProperty({ example: true })
+  available!: boolean
+}
+
+export class ResolveQueryStockDto {
+  @ApiProperty({ example: '11111111-1111-4111-8111-111111111099' })
+  id!: string
+
+  @ApiProperty({ example: 'AVAZ' })
+  symbol!: string
+
+  @ApiProperty({ example: 'MOEX' })
+  exchange!: string
+
+  @ApiProperty({
+    example: 'ready',
+    enum: ['pending', 'importing', 'ready', 'failed'],
+  })
+  importStatus!: 'pending' | 'importing' | 'ready' | 'failed'
+
+  @ApiPropertyOptional({ example: null, nullable: true, type: String })
+  imageUrl?: string | null
+
+  @ApiPropertyOptional({ example: 'АвтоВАЗ' })
+  companyName?: string
+}
+
+export class ResolveStockQueryResponseDto {
+  @ApiPropertyOptional({ type: ResolveQueryStockDto, nullable: true })
+  resolved!: ResolveQueryStockDto | null
+
+  @ApiProperty({ type: StockQueryCandidateDto, isArray: true })
+  candidates!: StockQueryCandidateDto[]
+
+  @ApiProperty({ type: StockQueryTriedDto, isArray: true })
+  tried!: StockQueryTriedDto[]
 }
 
 export class ResolveStockResponseDto {
@@ -246,8 +320,8 @@ export class StockHistoryDto {
   @ApiPropertyOptional({ example: null, nullable: true, type: String })
   imageUrl!: string | null
 
-  @ApiProperty({ example: 'USD', enum: ['RUB', 'USD'] })
-  nativeCurrency!: 'RUB' | 'USD'
+  @ApiProperty({ example: 'MNT' })
+  nativeCurrency!: string
 
   @ApiProperty({ example: 'RUB', enum: ['RUB', 'USD'] })
   displayCurrency!: 'RUB' | 'USD'

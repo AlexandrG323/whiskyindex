@@ -7,6 +7,7 @@ const POPULAR_EXCHANGES = ['MOEX', 'NASDAQ', 'NYSE', 'LSE'] as const
 const POLL_MS = 1500
 const POLL_ATTEMPTS = 40
 
+type DialogMode = 'query' | 'ticker'
 type ImportStatus = 'pending' | 'importing' | 'ready' | 'failed'
 
 type ResolveResponse = {
@@ -20,6 +21,32 @@ type StockDetail = {
   symbol: string
   exchange: string
   importStatus: ImportStatus
+}
+
+type QueryCandidate = {
+  symbol: string
+  exchange: string
+  companyName: string
+  confidence: number
+  reason: string
+}
+
+type QueryTried = {
+  symbol: string
+  exchange: string
+  available: boolean
+}
+
+type QueryResponse = {
+  resolved: {
+    id: string
+    symbol: string
+    exchange: string
+    importStatus: ImportStatus
+    companyName?: string
+  } | null
+  candidates: QueryCandidate[]
+  tried: QueryTried[]
 }
 
 interface AddCustomStockDialogProps {
@@ -49,6 +76,10 @@ async function waitUntilReady(id: string, signal: AbortSignal): Promise<StockDet
   throw new Error('Импорт занимает слишком много времени. Попробуйте позже.')
 }
 
+function confidenceLabel(value: number) {
+  return `${Math.round(value * 100)}%`
+}
+
 export function AddCustomStockDialog({
   open,
   onClose,
@@ -60,30 +91,50 @@ export function AddCustomStockDialog({
   const tickerId = useId()
   const exchangeId = useId()
   const nameId = useId()
+  const queryId = useId()
 
+  const queryRef = useRef<HTMLInputElement>(null)
   const tickerRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<DialogMode>('query')
+  const [query, setQuery] = useState('')
   const [symbol, setSymbol] = useState('')
   const [exchange, setExchange] = useState('')
   const [customName, setCustomName] = useState('')
   const [exchangeOpen, setExchangeOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<QueryCandidate[]>([])
+  const [tried, setTried] = useState<QueryTried[]>([])
 
   const suggestions = useMemo(() => {
-    const query = exchange.trim().toUpperCase()
-    if (!query) return [...POPULAR_EXCHANGES]
-    return POPULAR_EXCHANGES.filter((name) => name.includes(query))
+    const next = exchange.trim().toUpperCase()
+    if (!next) return [...POPULAR_EXCHANGES]
+    return POPULAR_EXCHANGES.filter((name) => name.includes(next))
   }, [exchange])
+
+  const triedByListing = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const item of tried) {
+      map.set(listingKey(item.symbol, item.exchange), item.available)
+    }
+    return map
+  }, [tried])
 
   useEffect(() => {
     if (!open) return
+    setMode('query')
+    setQuery('')
     setSymbol('')
     setExchange('')
     setCustomName('')
     setExchangeOpen(false)
     setSubmitting(false)
+    setStatus(null)
     setError(null)
-    const frame = requestAnimationFrame(() => tickerRef.current?.focus())
+    setCandidates([])
+    setTried([])
+    const frame = requestAnimationFrame(() => queryRef.current?.focus())
     return () => cancelAnimationFrame(frame)
   }, [open])
 
@@ -98,8 +149,36 @@ export function AddCustomStockDialog({
 
   if (!open) return null
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const switchMode = (next: DialogMode) => {
+    if (submitting || next === mode) return
+    setMode(next)
+    setError(null)
+    setStatus(null)
+    setCandidates([])
+    setTried([])
+    requestAnimationFrame(() => {
+      if (next === 'query') queryRef.current?.focus()
+      else tickerRef.current?.focus()
+    })
+  }
+
+  const finishAdded = (
+    id: string,
+    nextSymbol: string,
+    nextExchange: string,
+    fallbackName?: string,
+  ) => {
+    const name = customName.trim() || fallbackName?.trim() || ''
+    onAdded({
+      id,
+      symbol: nextSymbol,
+      exchange: nextExchange,
+      ...(name ? { customName: name } : {}),
+    })
+    onClose()
+  }
+
+  const submitTicker = async (signal: AbortSignal) => {
     const nextSymbol = symbol.trim().toUpperCase()
     const nextExchange = exchange.trim().toUpperCase()
     if (!nextSymbol || !nextExchange) {
@@ -113,42 +192,99 @@ export function AddCustomStockDialog({
 
     setSubmitting(true)
     setError(null)
+    setStatus('Добавляем…')
+
+    const resolved = await fetchJson<ResolveResponse>('/api/v1/stocks/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: nextSymbol, exchange: nextExchange }),
+      signal,
+    })
+
+    if (existingIds.has(resolved.id)) {
+      throw new Error(`Акция ${nextSymbol} на ${nextExchange} уже в списке.`)
+    }
+    if (resolved.importStatus === 'failed') {
+      throw new Error('Не удалось загрузить котировки для этого тикера.')
+    }
+    if (resolved.importStatus !== 'ready') {
+      await waitUntilReady(resolved.id, signal)
+    }
+
+    finishAdded(resolved.id, resolved.symbol, nextExchange)
+  }
+
+  const submitQuery = async (signal: AbortSignal) => {
+    const nextQuery = query.trim()
+    if (!nextQuery) {
+      setError('Опишите компанию или акцию.')
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    setCandidates([])
+    setTried([])
+    setStatus('Ищем кандидатов…')
+    const probeHint = window.setTimeout(() => setStatus('Проверяем котировки…'), 2500)
+
+    let result: QueryResponse
+    try {
+      result = await fetchJson<QueryResponse>('/api/v1/stocks/resolve-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: nextQuery,
+          exclude: [...existingListings],
+        }),
+        signal,
+      })
+    } finally {
+      window.clearTimeout(probeHint)
+    }
+
+    setCandidates(result.candidates)
+    setTried(result.tried)
+
+    const resolved = result.resolved
+    if (!resolved) {
+      throw new Error(
+        'Не удалось найти акцию по этому описанию. Попробуйте иначе или укажите тикер.',
+      )
+    }
+
+    if (
+      existingIds.has(resolved.id) ||
+      existingListings.has(listingKey(resolved.symbol, resolved.exchange))
+    ) {
+      throw new Error(`Акция ${resolved.symbol} на ${resolved.exchange} уже в списке.`)
+    }
+    if (resolved.importStatus === 'failed') {
+      throw new Error('Не удалось загрузить котировки для этого тикера.')
+    }
+
+    setStatus(`Добавляем ${resolved.symbol}…`)
+    if (resolved.importStatus !== 'ready') {
+      await waitUntilReady(resolved.id, signal)
+    }
+
+    finishAdded(resolved.id, resolved.symbol, resolved.exchange, resolved.companyName)
+  }
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
     const abort = new AbortController()
 
     try {
-      const resolved = await fetchJson<ResolveResponse>('/api/v1/stocks/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: nextSymbol, exchange: nextExchange }),
-        signal: abort.signal,
-      })
-
-      if (existingIds.has(resolved.id)) {
-        throw new Error(`Акция ${nextSymbol} на ${nextExchange} уже в списке.`)
-      }
-
-      if (resolved.importStatus === 'failed') {
-        throw new Error('Не удалось загрузить котировки для этого тикера.')
-      }
-
-      if (resolved.importStatus !== 'ready') {
-        await waitUntilReady(resolved.id, abort.signal)
-      }
-
-      const name = customName.trim()
-      onAdded({
-        id: resolved.id,
-        symbol: resolved.symbol,
-        exchange: nextExchange,
-        ...(name ? { customName: name } : {}),
-      })
-      onClose()
+      if (mode === 'query') await submitQuery(abort.signal)
+      else await submitTicker(abort.signal)
     } catch (cause: unknown) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       const message = cause instanceof Error ? cause.message : String(cause)
       setError(
         message.includes('→') ? 'Не удалось добавить акцию. Проверьте тикер и биржу.' : message,
       )
+      setStatus(null)
       setSubmitting(false)
     }
   }
@@ -169,63 +305,109 @@ export function AddCustomStockDialog({
         onSubmit={submit}
       >
         <h3 id={titleId}>Добавить свою акцию</h3>
-        <p className="stock-dialog-lead">Тикер и биржа — как на биржевом терминале.</p>
 
-        <label className="stock-dialog-field" htmlFor={tickerId}>
-          Тикер
-          <input
-            ref={tickerRef}
-            id={tickerId}
-            name="symbol"
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            value={symbol}
-            onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-            placeholder="SBER"
-            disabled={submitting}
-          />
-        </label>
+        <fieldset className="stock-dialog-mode" disabled={submitting}>
+          <legend className="stock-dialog-mode-label">Как искать</legend>
+          <div className="stock-dialog-mode-buttons">
+            <button
+              type="button"
+              aria-pressed={mode === 'query'}
+              onClick={() => switchMode('query')}
+            >
+              Описание
+            </button>
+            <button
+              type="button"
+              aria-pressed={mode === 'ticker'}
+              onClick={() => switchMode('ticker')}
+            >
+              Тикер
+            </button>
+          </div>
+        </fieldset>
 
-        <label className="stock-dialog-field" htmlFor={exchangeId}>
-          Биржа
-          <input
-            id={exchangeId}
-            name="exchange"
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            value={exchange}
-            onChange={(event) => {
-              setExchange(event.target.value.toUpperCase())
-              setExchangeOpen(true)
-            }}
-            onFocus={() => setExchangeOpen(true)}
-            onBlur={() => {
-              window.setTimeout(() => setExchangeOpen(false), 120)
-            }}
-            placeholder="MOEX"
-            disabled={submitting}
-          />
-          {exchangeOpen && suggestions.length > 0 && (
-            <ul className="stock-dialog-suggestions">
-              {suggestions.map((name) => (
-                <li key={name}>
-                  <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      setExchange(name)
-                      setExchangeOpen(false)
-                    }}
-                  >
-                    {name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </label>
+        <p className="stock-dialog-lead">
+          {mode === 'query'
+            ? 'Опишите компанию своими словами — найдём тикер сами.'
+            : 'Тикер и биржа — как на биржевом терминале.'}
+        </p>
+
+        {mode === 'query' ? (
+          <label className="stock-dialog-field" htmlFor={queryId}>
+            Описание
+            <input
+              ref={queryRef}
+              id={queryId}
+              name="query"
+              type="text"
+              autoComplete="off"
+              spellCheck={true}
+              maxLength={200}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="автоваз"
+              disabled={submitting}
+            />
+          </label>
+        ) : (
+          <>
+            <label className="stock-dialog-field" htmlFor={tickerId}>
+              Тикер
+              <input
+                ref={tickerRef}
+                id={tickerId}
+                name="symbol"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={symbol}
+                onChange={(event) => setSymbol(event.target.value.toUpperCase())}
+                placeholder="SBER"
+                disabled={submitting}
+              />
+            </label>
+
+            <label className="stock-dialog-field" htmlFor={exchangeId}>
+              Биржа
+              <input
+                id={exchangeId}
+                name="exchange"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={exchange}
+                onChange={(event) => {
+                  setExchange(event.target.value.toUpperCase())
+                  setExchangeOpen(true)
+                }}
+                onFocus={() => setExchangeOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setExchangeOpen(false), 120)
+                }}
+                placeholder="MOEX"
+                disabled={submitting}
+              />
+              {exchangeOpen && suggestions.length > 0 && (
+                <ul className="stock-dialog-suggestions">
+                  {suggestions.map((name) => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setExchange(name)
+                          setExchangeOpen(false)
+                        }}
+                      >
+                        {name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </label>
+          </>
+        )}
 
         <label className="stock-dialog-field" htmlFor={nameId}>
           <span className="stock-dialog-field-label">
@@ -243,7 +425,30 @@ export function AddCustomStockDialog({
           />
         </label>
 
+        {status && <p className="stock-dialog-status">{status}</p>}
         {error && <p className="stock-dialog-error">{error}</p>}
+
+        {candidates.length > 0 && (
+          <ul className="stock-dialog-candidates">
+            {candidates.map((candidate) => {
+              const key = listingKey(candidate.symbol, candidate.exchange)
+              const available = triedByListing.get(key)
+              return (
+                <li
+                  key={key}
+                  data-available={
+                    available === true ? 'yes' : available === false ? 'no' : 'unknown'
+                  }
+                >
+                  <span>
+                    {candidate.symbol} · {candidate.exchange}
+                  </span>
+                  <span>{confidenceLabel(candidate.confidence)}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
 
         <div className="stock-dialog-actions">
           <button
@@ -255,7 +460,7 @@ export function AddCustomStockDialog({
             Отмена
           </button>
           <button type="submit" className="stock-dialog-submit" disabled={submitting}>
-            {submitting ? 'Добавляем…' : 'Добавить'}
+            {submitting ? (mode === 'query' ? 'Ищем…' : 'Добавляем…') : 'Добавить'}
           </button>
         </div>
       </form>

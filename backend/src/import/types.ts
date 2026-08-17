@@ -10,7 +10,7 @@ export type YearlyAveragePrice = {
    * null for MOEX, which publishes no usable dividend history for this period.
    */
   totalReturnPrice: number | null
-  currency: 'RUB' | 'USD'
+  currency: string
 }
 
 /** Месячная свеча (OHLC) — сырые данные с биржи. */
@@ -32,4 +32,6 @@ export type CandleFetchResult = {
   candles: MonthlyCandle[]
   /** Issuer name from the venue, when it sent one. */
   companyName: string | null
+  /** Venue quote currency (Yahoo `meta.currency`), when present. */
+  currency: string | null
 }

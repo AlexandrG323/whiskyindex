@@ -7,6 +7,7 @@ type YahooChartResponse = {
       meta?: {
         shortName?: string
         longName?: string
+        currency?: string
       }
       timestamp?: number[]
       indicators?: {
@@ -114,7 +115,11 @@ export class YahooClient {
     const result = json.chart?.result?.[0]
 
     if (!result?.timestamp || !result.indicators?.quote?.[0]) {
-      return { candles: [], companyName: result?.meta?.longName ?? result?.meta?.shortName ?? null }
+      return {
+        candles: [],
+        companyName: result?.meta?.longName ?? result?.meta?.shortName ?? null,
+        currency: result?.meta?.currency ?? null,
+      }
     }
 
     const timestamps = result.timestamp
@@ -151,6 +156,7 @@ export class YahooClient {
     return {
       candles,
       companyName: result.meta?.longName ?? result.meta?.shortName ?? null,
+      currency: result.meta?.currency ?? null,
     }
   }
 }

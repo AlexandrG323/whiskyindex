@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS stocks (
   exchange varchar(32) NOT NULL,
   source varchar(16) NOT NULL CHECK (source IN ('moex', 'yahoo')),
   image_url text,
-  native_currency char(3) NOT NULL CHECK (native_currency IN ('RUB', 'USD')),
+  native_currency char(3) NOT NULL CHECK (native_currency ~ '^[A-Z]{3}$'),
   is_curated boolean NOT NULL DEFAULT false,
   is_active boolean NOT NULL DEFAULT true,
   import_status varchar(16) NOT NULL DEFAULT 'pending'
@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS products (
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS available_from smallint;
 ALTER TABLE stock_prices ADD COLUMN IF NOT EXISTS total_return_price numeric(18, 6);
+
+-- Listing currency is the venue's ISO code (MNT, GBP, …), not only RUB/USD.
+-- CREATE TABLE IF NOT EXISTS does not replace the old IN ('RUB','USD') check
+-- on an existing volume, so drop/add is required.
+ALTER TABLE stocks DROP CONSTRAINT IF EXISTS stocks_native_currency_check;
+ALTER TABLE stocks ADD CONSTRAINT stocks_native_currency_check
+  CHECK (native_currency ~ '^[A-Z]{3}$');
 
 CREATE TABLE IF NOT EXISTS product_prices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
