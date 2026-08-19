@@ -35,6 +35,13 @@
   box-sizing: border-box;
 }
 
+/* iOS Safari zooms the page when a focused text field is under 16px. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+select,
+textarea {
+  font-size: 1rem;
+}
+
 body {
   margin: 0;
   /* dvh, not vh — the mobile URL bar collapsing must not shift the layout. */

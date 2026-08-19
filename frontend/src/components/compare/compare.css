@@ -1108,7 +1108,9 @@
   background: var(--card);
   color: var(--text);
   font: inherit;
-  font-size: 0.9375rem;
+  /* 1rem, not 0.9375rem: iOS Safari zooms the page when a focused field is
+     under 16px. */
+  font-size: 1rem;
   letter-spacing: 0.04em;
 }
 
