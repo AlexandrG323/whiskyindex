@@ -588,15 +588,19 @@ section:first-child > h2:first-child {
   position: sticky;
   top: 0;
   align-self: start;
-  min-height: 100dvh;
+  /* 100dvh inside #root's padding overshoots the viewport by --page-pad
+     unless both ends are cancelled — that leftover is the "tiny" desktop
+     scroll. overflow is clipped so a subpixel miss cannot create a
+     scroll container the wheel can nudge. */
+  height: 100dvh;
   max-height: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 30;
   margin-top: calc(-1 * var(--page-pad));
+  margin-bottom: calc(-1 * var(--page-pad));
   padding-top: var(--page-pad);
-  padding-bottom: 0.5rem;
+  padding-bottom: var(--page-pad);
   background: var(--bg);
-  scrollbar-width: thin;
 }
 
 .nav-scrim {
@@ -753,6 +757,8 @@ section:first-child > h2:first-child {
     height: 100dvh;
     margin: 0;
     padding: var(--page-pad);
+    overflow-y: auto;
+    scrollbar-width: thin;
     z-index: 60;
     background: var(--card);
     border-right: 1px solid var(--border);
