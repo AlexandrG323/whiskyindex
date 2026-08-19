@@ -169,21 +169,14 @@
   color: var(--muted);
 }
 
-/* Outer tracks run wide: the chart has plenty of room on a large screen and
-   the picker/equivalents lists were being squeezed into narrow columns. */
+/* Stacked by default. The desktop stretch (`height: 0; min-height: 100%`)
+   must never be the cascade default — iOS Safari does not reliably undo it
+   with `height: auto`, so the picker collapsed and painted over the chart. */
 .compare-main-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 312px) minmax(0, 1fr) minmax(230px, 286px);
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
   align-items: stretch;
-}
-
-/* Contribute 0 to the row so the chart sets its height; then fill that
-   height and scroll. Overflow stays visible — IconMenu opens past the card. */
-.compare-main-grid > :first-child,
-.compare-main-grid > :nth-child(3) {
-  height: 0;
-  min-height: 100%;
 }
 
 .compare-panel {
@@ -320,18 +313,19 @@
   line-height: 1.35;
 }
 
-/* Grows to fill the panel instead of stopping at a fixed height — the panel
-   is stretched to the chart's height by the grid, so a capped list left a
-   block of dead space under it. */
+/* A definite height + a shrinkable grid row is what makes the list scroll
+   instead of overflowing the panel (iOS treats `max-height` on a grid as a
+   suggestion and lets min-content win). */
 .stock-picker-scroll {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 10px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 0.35rem;
-  /* basis 0, not auto: the list fills whatever height the row has without its
-     18 items dictating that height (which stretched the chart to ~900px). */
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  height: min(17.5rem, 45dvh);
   min-height: 8rem;
+  overflow: hidden;
 }
 
 .stock-picker {
@@ -341,9 +335,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  height: 100%;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  min-height: 0;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -802,9 +797,48 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Two columns once the drawer is gone: picker | chart, equivalents below.
+   Stretch only the picker to the chart — `height: 0` is scoped here so a
+   phone never sees it. Overflow stays visible on the panel so IconMenu can
+   open past the card; the list itself clips inside `.stock-picker-scroll`. */
+@media (min-width: 769px) {
+  .compare-main-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  }
+
+  .compare-main-grid > :first-child {
+    height: 0;
+    min-height: 100%;
+  }
+
+  .compare-main-grid > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .stock-picker-scroll {
+    flex: 1 1 0;
+    height: auto;
+  }
+}
+
+/* Outer tracks run wide: sidebar + picker + chart + equivalents actually fit. */
+@media (min-width: 1281px) {
+  .compare-main-grid {
+    grid-template-columns: minmax(240px, 312px) minmax(0, 1fr) minmax(230px, 286px);
+    gap: 1.25rem;
+  }
+
+  .compare-main-grid > :first-child,
+  .compare-main-grid > :nth-child(3) {
+    grid-column: auto;
+    height: 0;
+    min-height: 100%;
+  }
+}
+
 /* Mid-size: sidebar rail is already on at 1024px, so three columns leave the
-   chart a sliver. Hold the 2-col layout (equivalents below, advantage spans)
-   until 1280px, where sidebar + picker + chart + list actually fit. */
+   chart a sliver. Hero/advantage still collapse here; the compare grid is
+   handled by the min-width queries above. */
 @media (max-width: 1280px) {
   .compare-page {
     gap: 1.5rem;
@@ -817,17 +851,6 @@
 
   .advantage-card {
     grid-column: 1 / -1;
-  }
-
-  .compare-main-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    gap: 1rem;
-  }
-
-  .compare-main-grid > :nth-child(3) {
-    grid-column: 1 / -1;
-    height: auto;
-    min-height: 0;
   }
 }
 
@@ -850,18 +873,6 @@
     grid-column: auto;
   }
 
-  .compare-main-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-  }
-
-  .compare-main-grid > :first-child,
-  .compare-main-grid > :nth-child(3) {
-    grid-column: auto;
-    height: auto;
-    min-height: 0;
-  }
-
   .growth-chart-frame {
     height: clamp(200px, 45vw, 300px);
   }
@@ -870,11 +881,12 @@
     flex-wrap: wrap;
   }
 
-  /* Stacked, the panel no longer borrows the chart's height, so the list
-     needs a cap of its own again. */
-  .stock-picker-scroll {
-    flex: 0 0 auto;
-    max-height: 280px;
+  /* A full selection used to wrap into a pile of overlapping labels. */
+  .growth-chart-legend {
+    max-height: 5.25rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
