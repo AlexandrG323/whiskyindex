@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { fetchJson } from '../../lib/api'
 import { type CustomStock, listingKey } from '../../lib/customStocks'
 import type { StockAddedNotice } from './StockAddedToast'
@@ -144,7 +144,7 @@ export function AddCustomStockDialog({
   }, [tried])
 
   useEffect(() => {
-    if (!open) return
+    if (open) return
     setMode('query')
     setQuery('')
     setSymbol('')
@@ -156,9 +156,12 @@ export function AddCustomStockDialog({
     setError(null)
     setCandidates([])
     setTried([])
-    const frame = requestAnimationFrame(() => queryRef.current?.focus())
-    return () => cancelAnimationFrame(frame)
   }, [open])
+
+  useLayoutEffect(() => {
+    if (!open || mode !== 'query') return
+    queryRef.current?.focus()
+  }, [open, mode])
 
   useEffect(() => {
     if (!open || submitting) return
