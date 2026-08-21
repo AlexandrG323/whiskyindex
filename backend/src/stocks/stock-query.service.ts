@@ -23,10 +23,96 @@ Rules:
 - confidence is a number from 0 to 1.
 - For Russian stocks use exchange MOEX (or TQBR) and the ISS ticker WITHOUT a Yahoo suffix (SBER, GAZP, AVAZ — never SBER.ME).
 - For every other venue use Yahoo Finance ticker conventions: put the Yahoo suffix IN the symbol (VOD.L, 7203.T, 0700.HK, BMW.DE, RR.L). Exchange is the human venue name (LSE, NASDAQ, NYSE, HKEX, TSE, FRA, and so on).
-- MOEX and TQBR are the only exchanges fetched from MOEX ISS; anything else is fetched from Yahoo using the symbol as-is.
+- MOEX and TQBR are fetched from MOEX ISS. Everything else is fetched from Yahoo using the symbol as-is. If Yahoo has no chart for a venue, we cannot import it.
+- Do NOT return tickers from boards Yahoo does not cover (UZSE/Tashkent, many Caucasus, Central Asian, and African local boards, and similar). Empty candidates is better than local codes we cannot fetch. An ADR, GDR, or other Yahoo-listed cross-listing is fine when one exists.
 - Prefer ordinary shares that are or were publicly listed. Avoid ETFs unless the query asks for a fund.
-- If the query is qualitative ("fastest growing British stock"), pick plausible well-known listings and say so in reason.
+- If the query is qualitative ("fastest growing British stock"), pick plausible well-known listings that Yahoo or MOEX actually has and say so in reason.
 - Never invent private companies that are not listed.`
+
+/** Yahoo chart suffix when the model gives a bare ticker + venue name. */
+const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
+  LSE: '.L',
+  LON: '.L',
+  LONDON: '.L',
+  TSE: '.T',
+  TYO: '.T',
+  TOKYO: '.T',
+  JPX: '.T',
+  HKEX: '.HK',
+  HKG: '.HK',
+  HK: '.HK',
+  FRA: '.DE',
+  ETR: '.DE',
+  XETRA: '.DE',
+  GER: '.DE',
+  FSE: '.F',
+  PAR: '.PA',
+  EPA: '.PA',
+  AMS: '.AS',
+  AEX: '.AS',
+  BRU: '.BR',
+  EBR: '.BR',
+  LIS: '.LS',
+  ELI: '.LS',
+  MIL: '.MI',
+  BIT: '.MI',
+  MAD: '.MC',
+  MCE: '.MC',
+  BME: '.MC',
+  SWX: '.SW',
+  SIX: '.SW',
+  VTX: '.SW',
+  STO: '.ST',
+  CPH: '.CO',
+  CSE: '.CO',
+  HEL: '.HE',
+  OSL: '.OL',
+  VIE: '.VI',
+  WBO: '.VI',
+  WAR: '.WA',
+  WSE: '.WA',
+  PRA: '.PR',
+  PSE: '.PR',
+  IST: '.IS',
+  BIST: '.IS',
+  TSX: '.TO',
+  TOR: '.TO',
+  ASX: '.AX',
+  AX: '.AX',
+  KRX: '.KS',
+  KOSPI: '.KS',
+  SEOUL: '.KS',
+  KOSDAQ: '.KQ',
+  SSE: '.SS',
+  SHA: '.SS',
+  SHANGHAI: '.SS',
+  SZSE: '.SZ',
+  SHE: '.SZ',
+  SHENZHEN: '.SZ',
+  BSE: '.BO',
+  BOM: '.BO',
+  NSE: '.NS',
+  NSEI: '.NS',
+  TPE: '.TW',
+  TWSE: '.TW',
+  TAIWAN: '.TW',
+  JSE: '.JO',
+  JOH: '.JO',
+  SAO: '.SA',
+  B3: '.SA',
+  BOVESPA: '.SA',
+  MEX: '.MX',
+  BMV: '.MX',
+  TASE: '.TA',
+  TLV: '.TA',
+}
+
+function yahooRetrySymbol(symbol: string, exchange: string): string | null {
+  if (symbol.includes('.')) return null
+  if (exchange === 'MOEX' || exchange === 'TQBR') return null
+  const suffix = YAHOO_SUFFIX_BY_EXCHANGE[exchange.replace(/[^A-Z0-9]/g, '')]
+  return suffix ? `${symbol}${suffix}` : null
+}
 
 @Injectable()
 export class StockQueryService {
@@ -61,13 +147,26 @@ export class StockQueryService {
         if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
           return { candidate, excluded: true as const }
         }
-        const probe = await this.stockImport.probeSymbol(
-          candidate.symbol,
-          sourceFromExchange(candidate.exchange),
-        )
+        const source = sourceFromExchange(candidate.exchange)
+        const probe = await this.stockImport.probeSymbol(candidate.symbol, source)
+        if (!probe.available) {
+          const retrySymbol = yahooRetrySymbol(candidate.symbol, candidate.exchange)
+          if (retrySymbol) {
+            const retry = await this.stockImport.probeSymbol(retrySymbol, 'yahoo')
+            if (retry.available) {
+              return {
+                candidate: { ...candidate, symbol: retrySymbol },
+                excluded: false as const,
+                probe: retry,
+              }
+            }
+          }
+        }
         return { candidate, excluded: false as const, probe }
       }),
     )
+
+    const listed = probes.flatMap((item) => (item.excluded ? [] : [item.candidate]))
 
     const tried: StockQueryTriedDto[] = probes.flatMap((item) =>
       item.excluded
@@ -108,10 +207,10 @@ export class StockQueryService {
         ...(companyName ? { companyName } : {}),
       }
 
-      return { resolved: payload, candidates, tried }
+      return { resolved: payload, candidates: listed, tried }
     }
 
-    return { resolved: null, candidates, tried }
+    return { resolved: null, candidates: listed, tried }
   }
 }
 

@@ -96,10 +96,6 @@ async function loadReadyDetail(
   return fetchJson<StockDetail>(`/api/v1/stocks/${id}`, { signal })
 }
 
-function confidenceLabel(value: number) {
-  return `${Math.round(value * 100)}%`
-}
-
 function coverageLabel(firstYear: number | null, lastYear: number | null) {
   if (firstYear === null || lastYear === null) return null
   if (firstYear === lastYear) return String(firstYear)
@@ -292,7 +288,9 @@ export function AddCustomStockDialog({
     const resolved = result.resolved
     if (!resolved) {
       throw new Error(
-        'Не удалось найти акцию по этому описанию. Попробуйте иначе или укажите тикер.',
+        result.candidates.length > 0
+          ? 'Нет котировок на MOEX и Yahoo по этим тикерам. Укажите тикер вручную.'
+          : 'Не удалось найти акцию по этому описанию. Попробуйте иначе или укажите тикер.',
       )
     }
 
@@ -498,7 +496,7 @@ export function AddCustomStockDialog({
                       <span>
                         {candidate.symbol} · {candidate.exchange}
                       </span>
-                      <span>{confidenceLabel(candidate.confidence)}</span>
+                      <span>нет котировок на MOEX/Yahoo</span>
                     </>
                   )}
                 </li>
