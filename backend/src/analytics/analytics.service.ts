@@ -212,6 +212,10 @@ export class AnalyticsService {
       ...range,
       atFrom: this.purchasingPower(ends.priceFrom, basket.cartFrom, basket.jamesonFrom),
       atTo: this.purchasingPower(ends.priceTo, basket.cartTo, basket.jamesonTo),
+      // The basket at THIS stock's first priced year, which is not the range's
+      // `from` when the stock starts later. Callers deriving "what one basket
+      // would have become" need this one, not the top-level cart.
+      cartAtFrom: this.roundMoney(basket.cartFrom),
       whiskyShare: this.roundRatio(await this.whiskyShare(ends, basket, currency, loadRate)),
     }
   }

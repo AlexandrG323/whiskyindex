@@ -466,6 +466,13 @@ export class StockCompareItemDto extends StockPriceRangeDto {
       'Cart-sized P&L in today’s Jameson bottles, always computed in RUB so the count does not change with the UI currency.',
   })
   whiskyShare!: number
+
+  @ApiProperty({
+    example: 1442.17,
+    description:
+      'Basket price in priceFromYear — the sum notionally invested in THIS stock. Not the same as cart.priceFrom when the stock starts later than the requested range (АвтоВАЗ from 2007 inside a 1998-2026 window).',
+  })
+  cartAtFrom!: number
 }
 
 /** A requested stock that could not be compared in the selected range. */

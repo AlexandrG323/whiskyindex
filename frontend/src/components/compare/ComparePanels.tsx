@@ -168,8 +168,6 @@ interface EquivalentsPanelProps {
     name: string
     price: number | null
   }[]
-  /** Cart price at `from` — the sum that was notionally invested. */
-  cartPriceFrom: number
   /** Cart price at `to` — what one basket costs in the "Корзина скуфа" row. */
   cartPriceTo: number
   currency: 'RUB' | 'USD'
@@ -196,7 +194,6 @@ export function EquivalentsPanel({
   selectedId,
   onSelect,
   products,
-  cartPriceFrom,
   cartPriceTo,
   currency,
 }: EquivalentsPanelProps) {
@@ -212,7 +209,7 @@ export function EquivalentsPanel({
     )
   }
 
-  const profit = stockProfit(stock, cartPriceFrom)
+  const profit = stockProfit(stock)
   const absProfit = Math.abs(profit)
   const lost = profit < 0
 
@@ -288,8 +285,8 @@ export function EquivalentsPanel({
         </>
       )}
       <p className="muted equivalents-footnote">
-        Если бы купили {stock.companyName} в {stock.priceFromYear} за{' '}
-        {formatMoney(cartPriceFrom, currency)}
+        Если бы купили {stock.companyName} в {stock.priceFromYear} на{' '}
+        {formatMoney(stock.cartAtFrom, currency)}
       </p>
     </aside>
   )

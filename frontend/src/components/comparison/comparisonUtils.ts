@@ -28,13 +28,15 @@ export function formatMoney(amount: number, currency: 'RUB' | 'USD') {
 /**
  * Cart-sized P&L over the period, in the display currency.
  *
- * Derived from growthPercent rather than shares × price: the backend rounds
- * prices to two decimals and sharesPerCart to four, so a penny stock bought
- * 60 000 shares deep turns half-kopeck rounding into hundreds of roubles of
- * phantom profit. growthPercent comes off the unrounded prices.
+ * Both inputs come off the same stock, so the basket is the one from the
+ * stock's own first priced year — `cart.priceFrom` is the range's `from`,
+ * which is a different (much cheaper) basket whenever the stock starts late.
+ * Deriving from growthPercent rather than shares × price also keeps penny
+ * stocks honest: prices are rounded to two decimals and sharesPerCart to
+ * four, so 60 000 shares turn half-kopeck rounding into hundreds of roubles.
  */
-export function stockProfit(stock: CompareStock, cartPriceFrom: number) {
-  return (cartPriceFrom * stock.growthPercent) / 100
+export function stockProfit(stock: CompareStock) {
+  return (stock.cartAtFrom * stock.growthPercent) / 100
 }
 
 export function stockInvestmentRange(stock: CompareStock) {

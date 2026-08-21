@@ -16,6 +16,8 @@ export type CompareStock = {
   growthPercent: number
   atFrom: { sharesPerCart: number }
   whiskyShare: number
+  /** Basket price in priceFromYear — the sum notionally invested in this stock. */
+  cartAtFrom: number
 }
 
 interface HeroComparisonProps {
