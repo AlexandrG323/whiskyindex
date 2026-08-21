@@ -10,6 +10,7 @@ import {
   PurchasingPowerDto,
   StockCompareItemDto,
   StockPriceRangeDto,
+  StockSkippedDto,
 } from '../dto/common.dto'
 import { ProductsService } from '../products/products.service'
 import { StocksService } from '../stocks/stocks.service'
@@ -18,6 +19,14 @@ import { StocksService } from '../stocks/stocks.service'
 const JAMESON_PRODUCT_ID = '22222222-2222-4222-8222-222222222001'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+type EndpointPrices = Awaited<ReturnType<StocksService['getEndpointPrices']>>
+
+/** Request-scoped readers so N stocks do not re-read the same basket/rate. */
+type CartLoader = (year: number, currency: 'rub' | 'usd') => Promise<ProductYearlyPriceDto[]>
+type RateLoader = (year: number) => Promise<number | null>
+
+type BasketTotals = { cartFrom: number; cartTo: number; jamesonFrom: number; jamesonTo: number }
 
 @Injectable()
 export class AnalyticsService {
@@ -38,7 +47,14 @@ export class AnalyticsService {
     this.assertYearRange(from, to)
 
     const displayCurrency = currency === 'usd' ? 'USD' : 'RUB'
-    const { cart, jameson } = await this.loadCartAndJameson(from, to, currency)
+
+    // Every stock re-derives the same basket for the same years. Memoise the
+    // per-year cart (and USD/RUB rate) for the lifetime of this request so N
+    // stocks cost one basket read instead of N+1.
+    const loadCart = this.cartLoader()
+    const loadRate = this.rateLoader()
+
+    const { cart, jameson } = await this.loadCartAndJameson(from, to, currency, loadCart)
 
     const ids =
       stockIds.length > 0
@@ -47,20 +63,33 @@ export class AnalyticsService {
 
     // Parallel: each stock ensures its own import if history is incomplete
     const settled = await Promise.allSettled(
-      ids.map((id) => this.buildStockCompareItem(id, from, to, currency)),
+      ids.map((id) => this.buildStockCompareItem(id, from, to, currency, loadCart, loadRate)),
     )
 
     const stocks: StockCompareItemDto[] = []
+    const skipped: StockSkippedDto[] = []
     for (let i = 0; i < settled.length; i++) {
       const result = settled[i]
       if (result.status === 'fulfilled') {
         stocks.push(result.value)
-      } else {
-        this.logger.warn(
-          `Skipping stock ${ids[i]} in compare overview: ${
-            result.reason instanceof Error ? result.reason.message : String(result.reason)
-          }`,
-        )
+        continue
+      }
+
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason)
+      this.logger.warn(`Skipping stock ${ids[i]} in compare overview: ${reason}`)
+
+      try {
+        const detail = await this.stocks.getById(ids[i])
+        skipped.push({
+          id: detail.id,
+          symbol: detail.symbol,
+          companyName: detail.companyName,
+          exchange: detail.exchange,
+          imageUrl: detail.imageUrl,
+          coverage: detail.coverage,
+        })
+      } catch {
+        // Unknown id — nothing to show in the picker.
       }
     }
 
@@ -71,6 +100,7 @@ export class AnalyticsService {
       cart,
       jameson,
       stocks,
+      skipped,
     }
   }
 
@@ -91,7 +121,12 @@ export class AnalyticsService {
     const stockRange = await this.buildStockPriceRange(id, from, to, currency)
 
     const { cart, jameson, cartFrom, cartTo, jamesonFrom, jamesonTo } =
-      await this.loadCartAndJameson(stockRange.priceFromYear, stockRange.priceToYear, currency)
+      await this.loadCartAndJameson(
+        stockRange.priceFromYear,
+        stockRange.priceToYear,
+        currency,
+        this.cartLoader(),
+      )
 
     const atFrom = this.purchasingPower(stockRange.priceFrom, cartFrom, jamesonFrom)
     const atTo = this.purchasingPower(stockRange.priceTo, cartTo, jamesonTo)
@@ -114,10 +149,15 @@ export class AnalyticsService {
     }
   }
 
-  private async loadCartAndJameson(from: number, to: number, currency: 'rub' | 'usd') {
+  private async loadCartAndJameson(
+    from: number,
+    to: number,
+    currency: 'rub' | 'usd',
+    loadCart: CartLoader,
+  ) {
     const [cartItemsFrom, cartItemsTo] = await Promise.all([
-      this.products.getCart(from, currency),
-      this.products.getCart(to, currency),
+      loadCart(from, currency),
+      loadCart(to, currency),
     ])
 
     const cartFrom = this.sumCart(cartItemsFrom)
@@ -161,20 +201,22 @@ export class AnalyticsService {
     from: number,
     to: number,
     currency: 'rub' | 'usd',
+    loadCart: CartLoader,
+    loadRate: RateLoader,
   ): Promise<StockCompareItemDto> {
-    const range = await this.buildStockPriceRange(id, from, to, currency)
-
-    // Align cart/Jameson with the years we actually used for the stock
-    const { cartFrom, cartTo, jamesonFrom, jamesonTo } = await this.loadCartAndJameson(
-      range.priceFromYear,
-      range.priceToYear,
-      currency,
-    )
+    const ends = await this.stocks.getEndpointPrices(id, from, to, currency)
+    const basket = await this.loadCartAndJameson(ends.fromYear, ends.toYear, currency, loadCart)
+    const range = this.toStockPriceRange(ends)
 
     return {
       ...range,
-      atFrom: this.purchasingPower(range.priceFrom, cartFrom, jamesonFrom),
-      atTo: this.purchasingPower(range.priceTo, cartTo, jamesonTo),
+      atFrom: this.purchasingPower(ends.priceFrom, basket.cartFrom, basket.jamesonFrom),
+      atTo: this.purchasingPower(ends.priceTo, basket.cartTo, basket.jamesonTo),
+      // The basket at THIS stock's first priced year, which is not the range's
+      // `from` when the stock starts later. Callers deriving "what one basket
+      // would have become" need this one, not the top-level cart.
+      cartAtFrom: this.roundMoney(basket.cartFrom),
+      whiskyShare: this.roundRatio(await this.whiskyShare(ends, basket, currency, loadRate)),
     }
   }
 
@@ -189,7 +231,10 @@ export class AnalyticsService {
     currency: 'rub' | 'usd',
   ): Promise<StockPriceRangeDto> {
     const endpoints = await this.stocks.getEndpointPrices(id, from, to, currency)
+    return this.toStockPriceRange(endpoints)
+  }
 
+  private toStockPriceRange(endpoints: EndpointPrices): StockPriceRangeDto {
     return {
       id: endpoints.id,
       symbol: endpoints.symbol,
@@ -201,6 +246,72 @@ export class AnalyticsService {
       priceFrom: this.roundMoney(endpoints.priceFrom),
       priceTo: this.roundMoney(endpoints.priceTo),
       growthPercent: this.growthPercent(endpoints.priceFrom, endpoints.priceTo),
+    }
+  }
+
+  /**
+   * Cart-sized P&L in today’s Jameson bottles, always in RUB so the count does
+   * not move when the UI currency does. Uses unrounded prices.
+   *
+   * In USD mode the readouts are scaled back to RUB with each endpoint year’s
+   * USD/RUB rate rather than re-running the whole comparison in RUB: every
+   * conversion in `convertToDisplay` is one per-year scalar, so the round trip
+   * is exact, and a NASDAQ stock no longer needs FX it did not need to render.
+   * A missing rate degrades this one label to the display currency instead of
+   * rejecting the stock outright.
+   */
+  private async whiskyShare(
+    ends: EndpointPrices,
+    basket: BasketTotals,
+    currency: 'rub' | 'usd',
+    loadRate: RateLoader,
+  ): Promise<number> {
+    let { priceFrom, priceTo } = ends
+    let { cartFrom, jamesonTo } = basket
+
+    if (currency === 'usd') {
+      const [rateFrom, rateTo] = await Promise.all([loadRate(ends.fromYear), loadRate(ends.toYear)])
+      if (rateFrom === null || rateTo === null) {
+        this.logger.warn(
+          `No USD/RUB rate for ${ends.fromYear}/${ends.toYear}; whisky index for ${ends.symbol} stays in USD`,
+        )
+      } else {
+        priceFrom *= rateFrom
+        priceTo *= rateTo
+        cartFrom *= rateFrom
+        jamesonTo *= rateTo
+      }
+    }
+
+    if (priceFrom === 0 || jamesonTo <= 0) return 0
+    const shares = cartFrom / priceFrom
+    return (shares * (priceTo - priceFrom)) / jamesonTo
+  }
+
+  /** Per-year cart reader, memoised for one request. */
+  private cartLoader(): CartLoader {
+    const cache = new Map<string, Promise<ProductYearlyPriceDto[]>>()
+    return (year, currency) => {
+      const key = `${year}|${currency}`
+      let hit = cache.get(key)
+      if (!hit) {
+        hit = this.products.getCart(year, currency)
+        cache.set(key, hit)
+      }
+      return hit
+    }
+  }
+
+  /** Per-year USD/RUB reader, memoised for one request. Missing rate → null. */
+  private rateLoader(): RateLoader {
+    const cache = new Map<number, Promise<number | null>>()
+    return (year) => {
+      let hit = cache.get(year)
+      if (!hit) {
+        hit = this.exchangeRateByYear(year).catch(() => null)
+        cache.set(year, hit)
+      }
+      return hit
     }
   }
 

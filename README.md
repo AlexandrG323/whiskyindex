@@ -62,7 +62,8 @@ API напрямую: **http://localhost:3000/api**.
 На первом старте Postgres применяет схему и демо-сид из `db/init/`
 (справочник акций без цен, продукты + цены, курсы USD/RUB). Цены акций
 подтягиваются Import Service из MOEX / Yahoo — см. `backend/src/import/HOMEWORK.md`.
-Если том `pgdata` уже есть — пересид: `./db/seed.sh` (или `docker compose down -v && docker compose up --build`).
+Если том `pgdata` уже есть — пересид: `npm run db:seed` (или `docker compose down -v && docker compose up --build`).
+Прод: `npm run db:seed:prod` (нужен `DATABASE_URL` в корневом `.env`).
 
 ## Локальная разработка (npm + только Postgres в Docker)
 
@@ -80,8 +81,9 @@ npm install
 # 2. Поднять только Postgres (+ схема/сид на пустом томе)
 cp .env.example .env
 docker compose up -d db
-# если том уже был — накатить демо-данные:
+# если том уже был — накатить демо-данные (всегда локальный Docker, не prod):
 npm run db:seed
+# прод (Neon / Fly): npm run db:seed:prod
 
 # 3. Backend
 cd backend
