@@ -90,6 +90,60 @@ export function SearchIcon() {
   )
 }
 
+/* Sidebar nav — one glyph per destination, so the rail reads at a glance. */
+
+export function HomeIcon() {
+  return (
+    <Glyph>
+      <path d="M2.4 6.9 8 2.3l5.6 4.6" />
+      <path d="M3.8 7.8v5.3a.7.7 0 0 0 .7.7h7a.7.7 0 0 0 .7-.7V7.8" />
+      <path d="M6.5 13.8V9.7h3v4.1" />
+    </Glyph>
+  )
+}
+
+export function CartIcon() {
+  return (
+    <Glyph>
+      <path d="M1.7 2.6h1.6l1.8 7.4h6.6l1.4-5.2H4.1" />
+      <circle cx="6.4" cy="12.7" r="1" />
+      <circle cx="11.4" cy="12.7" r="1" />
+    </Glyph>
+  )
+}
+
+export function StocksIcon() {
+  return (
+    <Glyph>
+      <path d="M1.9 11.5 6 7.3l2.6 2.6L14 4.3" />
+      <path d="M10.5 4.3H14v3.5" />
+    </Glyph>
+  )
+}
+
+/** Balance scales — deliberately not another chart, so it reads apart from Акции. */
+export function CompareIcon() {
+  return (
+    <Glyph>
+      <path d="M8 3.1v10.3" />
+      <path d="M5.3 13.6h5.4" />
+      <path d="M2.6 5.1h10.8" />
+      <path d="M0.9 9.3 2.6 5.1l1.7 4.2" />
+      <path d="M11.7 9.3 13.4 5.1l1.7 4.2" />
+    </Glyph>
+  )
+}
+
+export function InfoIcon() {
+  return (
+    <Glyph>
+      <circle cx="8" cy="8" r="5.8" />
+      <path d="M8 7.5v3.4" />
+      <path d="M8 5.2h.01" />
+    </Glyph>
+  )
+}
+
 export function GitHubIcon() {
   return (
     <svg
