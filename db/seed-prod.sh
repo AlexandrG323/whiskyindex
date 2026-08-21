@@ -32,7 +32,8 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-redacted=$(printf '%s' "$DATABASE_URL" | sed 's#://[^:/@]*:[^@]*@#://***:***@#')
+# `|` as the delimiter, not `#`: a `#` in the password made sed fail outright.
+redacted=$(printf '%s' "$DATABASE_URL" | sed 's|://[^:/@]*:[^@]*@|://***:***@|')
 
 echo "This will apply schema + demo seed to:"
 echo "  $redacted"

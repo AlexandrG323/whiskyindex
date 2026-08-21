@@ -13,6 +13,9 @@ import { StocksService } from './stocks.service'
 const MAX_QUERY_LENGTH = 200
 const MAX_CANDIDATES = 5
 
+/** Concurrent symbol probes. Each one is a full MIN_YEAR..MAX_YEAR fetch. */
+const PROBE_CONCURRENCY = 2
+
 const SYSTEM_PROMPT = `You map a free-form description of a publicly traded company or stock to ticker candidates.
 
 Return JSON only of the form:
@@ -29,12 +32,19 @@ Rules:
 - If the query is qualitative ("fastest growing British stock"), pick plausible well-known listings that Yahoo or MOEX actually has and say so in reason.
 - Never invent private companies that are not listed.`
 
-/** Yahoo chart suffix when the model gives a bare ticker + venue name. */
+/**
+ * Yahoo chart suffix when the model gives a bare ticker + venue name.
+ *
+ * Only unambiguous codes belong here. TSE (Tokyo/Toronto), BSE (Bombay/
+ * Budapest/Bahrain), CSE (Copenhagen/Canadian/Colombo) and PSE (Prague/
+ * Philippine) each name two real venues, and guessing wrong imports a
+ * different company under the ticker the user asked for — the unambiguous
+ * aliases below (TYO/JPX, TSX/TOR, BOM, CPH, PRA) cover the same venues.
+ */
 const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
   LSE: '.L',
   LON: '.L',
   LONDON: '.L',
-  TSE: '.T',
   TYO: '.T',
   TOKYO: '.T',
   JPX: '.T',
@@ -64,7 +74,6 @@ const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
   VTX: '.SW',
   STO: '.ST',
   CPH: '.CO',
-  CSE: '.CO',
   HEL: '.HE',
   OSL: '.OL',
   VIE: '.VI',
@@ -72,7 +81,6 @@ const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
   WAR: '.WA',
   WSE: '.WA',
   PRA: '.PR',
-  PSE: '.PR',
   IST: '.IS',
   BIST: '.IS',
   TSX: '.TO',
@@ -89,7 +97,6 @@ const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
   SZSE: '.SZ',
   SHE: '.SZ',
   SHENZHEN: '.SZ',
-  BSE: '.BO',
   BOM: '.BO',
   NSE: '.NS',
   NSEI: '.NS',
@@ -142,31 +149,33 @@ export class StockQueryService {
 
     const candidates = parseCandidates(await this.openRouter.chatJson(SYSTEM_PROMPT, query))
 
-    const probes = await Promise.all(
-      candidates.map(async (candidate) => {
-        if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
-          return { candidate, excluded: true as const }
-        }
-        const source = sourceFromExchange(candidate.exchange)
-        const probe = await this.stockImport.probeSymbol(candidate.symbol, source)
-        if (!probe.available) {
-          const retrySymbol = yahooRetrySymbol(candidate.symbol, candidate.exchange)
-          if (retrySymbol) {
-            const retry = await this.stockImport.probeSymbol(retrySymbol, 'yahoo')
-            if (retry.available) {
-              return {
-                candidate: { ...candidate, symbol: retrySymbol },
-                excluded: false as const,
-                probe: retry,
-              }
+    // Every candidate is probed (the dialog shows coverage for all of them),
+    // but a bare Promise.all fires up to MAX_CANDIDATES × 2 full-history
+    // requests at once — exactly the burst yahoo.client.ts warns 429s on.
+    const probes = await mapWithConcurrency(candidates, PROBE_CONCURRENCY, async (candidate) => {
+      if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
+        return { candidate, excluded: true as const }
+      }
+      const source = sourceFromExchange(candidate.exchange)
+      const probe = await this.stockImport.probeSymbol(candidate.symbol, source)
+      if (!probe.available) {
+        const retrySymbol = yahooRetrySymbol(candidate.symbol, candidate.exchange)
+        if (retrySymbol) {
+          const retry = await this.stockImport.probeSymbol(retrySymbol, 'yahoo')
+          if (retry.available) {
+            return {
+              candidate: { ...candidate, symbol: retrySymbol },
+              excluded: false as const,
+              probe: retry,
             }
           }
         }
-        return { candidate, excluded: false as const, probe }
-      }),
-    )
+      }
+      return { candidate, excluded: false as const, probe }
+    })
 
     const listed = probes.flatMap((item) => (item.excluded ? [] : [item.candidate]))
+    const excluded = probes.length - listed.length
 
     const tried: StockQueryTriedDto[] = probes.flatMap((item) =>
       item.excluded
@@ -207,11 +216,31 @@ export class StockQueryService {
         ...(companyName ? { companyName } : {}),
       }
 
-      return { resolved: payload, candidates: listed, tried }
+      return { resolved: payload, candidates: listed, tried, excluded }
     }
 
-    return { resolved: null, candidates: listed, tried }
+    return { resolved: null, candidates: listed, tried, excluded }
   }
+}
+
+/** Promise.all with a ceiling on how many run at once. Order is preserved. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await fn(items[index])
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
 }
 
 function sourceFromExchange(exchange: string): 'moex' | 'yahoo' {

@@ -25,6 +25,18 @@ export function formatMoney(amount: number, currency: 'RUB' | 'USD') {
   }).format(amount)
 }
 
+/**
+ * Cart-sized P&L over the period, in the display currency.
+ *
+ * Derived from growthPercent rather than shares × price: the backend rounds
+ * prices to two decimals and sharesPerCart to four, so a penny stock bought
+ * 60 000 shares deep turns half-kopeck rounding into hundreds of roubles of
+ * phantom profit. growthPercent comes off the unrounded prices.
+ */
+export function stockProfit(stock: CompareStock, cartPriceFrom: number) {
+  return (cartPriceFrom * stock.growthPercent) / 100
+}
+
 export function stockInvestmentRange(stock: CompareStock) {
   const shares = stock.atFrom.sharesPerCart
   return {
@@ -46,6 +58,7 @@ function whiskyWord(count: number) {
 export function formatWhiskyIndex(share: number): string {
   const lost = share < 0
   const abs = Math.abs(share)
+  if (abs === 0) return 'ни капли'
   if (abs < 0.08) return lost ? 'минус пару капель' : 'на пару капель'
   if (abs < 1) return lost ? 'минус стакан' : 'на стакан'
 

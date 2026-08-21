@@ -20,6 +20,12 @@ interface GrowthChartProps {
   onDeselectStock?: (id: string) => void
 }
 
+/**
+ * The cart series is interpolated between its two endpoints, so it has a real
+ * growth curve but no real intermediate prices — never print money for it.
+ */
+const CART_LINE_ID = 'cart'
+
 const STOCK_COLORS = [
   '#57d163',
   '#5b8def',
@@ -86,6 +92,7 @@ export function GrowthChart({
   const [hoverYear, setHoverYear] = useState<number | null>(null)
   const [pinned, setPinned] = useState(false)
   const [legendHoverId, setLegendHoverId] = useState<string | null>(null)
+  const [legendPointerType, setLegendPointerType] = useState<string>('mouse')
 
   const series = useMemo(() => {
     const yearSpan = Math.max(toYear - fromYear, 1)
@@ -96,7 +103,7 @@ export function GrowthChart({
     })
 
     const cartSeries: HistorySeries = {
-      id: 'cart',
+      id: CART_LINE_ID,
       label: 'Корзина',
       color: '#e9922e',
       prices: cartPrices,
@@ -164,6 +171,26 @@ export function GrowthChart({
 
   const { width, height } = size
 
+  // Both of these follow React's "adjust state when a prop changes" pattern —
+  // corrected during render, not in an effect, so the stale frame never paints.
+
+  // A pin belongs to the year range it was made in. Without this, changing the
+  // period leaves `pinned` true with an out-of-range `hoverYear`: the tooltip
+  // disappears and hover-to-inspect stays dead until the user clicks again.
+  const rangeKey = `${fromYear}-${toYear}`
+  const [pinnedRange, setPinnedRange] = useState(rangeKey)
+  if (pinnedRange !== rangeKey) {
+    setPinnedRange(rangeKey)
+    setPinned(false)
+    setHoverYear(null)
+  }
+
+  // Likewise a legend hover outlives the line it points at when the exchange
+  // filter or the selection changes, leaving every readout filtered away.
+  if (legendHoverId !== null && !growthLines.some((line) => line.id === legendHoverId)) {
+    setLegendHoverId(null)
+  }
+
   const allGrowth = growthLines.flatMap((s) => s.points.map((p) => p.growth))
   const minG = allGrowth.length ? Math.min(...allGrowth, 0) : 0
   const maxG = allGrowth.length ? Math.max(...allGrowth, 0) : 100
@@ -194,6 +221,18 @@ export function GrowthChart({
     setPinned(false)
     setHoverYear(null)
   }
+
+  useEffect(() => {
+    if (!pinned) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPinned(false)
+        setHoverYear(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pinned])
 
   const readouts =
     hoverYear === null
@@ -310,7 +349,7 @@ export function GrowthChart({
                     d={d}
                     fill="none"
                     stroke={line.color}
-                    strokeWidth={focused ? 3 : line.id === 'cart' ? 2.5 : 2}
+                    strokeWidth={focused ? 3 : line.id === CART_LINE_ID ? 2.5 : 2}
                     strokeOpacity={dimmed ? 0.18 : 1}
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -356,11 +395,13 @@ export function GrowthChart({
                     <span className="growth-chart-tooltip-value">
                       {formatPercent(legendLast.growth)}
                     </span>
-                    <span className="growth-chart-tooltip-price">
-                      {formatMoney(legendFirst.amount, currency)}
-                      <span aria-hidden="true"> → </span>
-                      {formatMoney(legendLast.amount, currency)}
-                    </span>
+                    {legendLine.id !== CART_LINE_ID && (
+                      <span className="growth-chart-tooltip-price">
+                        {formatMoney(legendFirst.amount, currency)}
+                        <span aria-hidden="true"> → </span>
+                        {formatMoney(legendLast.amount, currency)}
+                      </span>
+                    )}
                   </li>
                 </ul>
               </div>
@@ -395,9 +436,11 @@ export function GrowthChart({
                       <span className="growth-chart-swatch" style={{ background: r.color }} />
                       <span className="growth-chart-tooltip-label">{r.label}</span>
                       <span className="growth-chart-tooltip-value">{formatPercent(r.growth)}</span>
-                      <span className="growth-chart-tooltip-price">
-                        {formatMoney(r.amount, currency)}
-                      </span>
+                      {r.id !== CART_LINE_ID && (
+                        <span className="growth-chart-tooltip-price">
+                          {formatMoney(r.amount, currency)}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -412,7 +455,7 @@ export function GrowthChart({
 
           <ul className="growth-chart-legend">
             {growthLines.map((line) => {
-              const isCart = line.id === 'cart'
+              const isCart = line.id === CART_LINE_ID
               const hot = legendHoverId === line.id
               return (
                 <li key={line.id}>
@@ -421,14 +464,28 @@ export function GrowthChart({
                     className={`growth-chart-legend-item${isCart ? ' is-cart' : ''}${
                       hot ? ' is-hot' : ''
                     }`}
-                    aria-label={isCart ? line.label : `Убрать ${line.label} из сравнения`}
+                    aria-label={
+                      isCart || legendPointerType !== 'mouse'
+                        ? line.label
+                        : `Убрать ${line.label} из сравнения`
+                    }
                     title={isCart ? undefined : 'Убрать из сравнения'}
-                    onPointerEnter={() => setLegendHoverId(line.id)}
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === 'mouse') setLegendHoverId(line.id)
+                    }}
                     onPointerLeave={() =>
                       setLegendHoverId((current) => (current === line.id ? null : current))
                     }
+                    // Mouse only: on touch a single tap fires pointerenter and
+                    // click together, so tapping a legend entry to highlight
+                    // it would silently drop the stock from the comparison.
+                    onPointerDown={(e) => setLegendPointerType(e.pointerType)}
                     onClick={() => {
                       if (isCart) return
+                      if (legendPointerType !== 'mouse') {
+                        setLegendHoverId((current) => (current === line.id ? null : line.id))
+                        return
+                      }
                       setLegendHoverId(null)
                       onDeselectStock?.(line.id)
                     }}

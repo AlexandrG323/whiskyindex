@@ -470,7 +470,8 @@ export function ComparePage({ currency }: ComparePageProps) {
             stocks={selectedStocks}
             selectedId={equivalentStock?.id ?? null}
             onSelect={setEquivalentStockId}
-            cartPrice={compare.cart.priceTo}
+            cartPriceFrom={compare.cart.priceFrom}
+            cartPriceTo={compare.cart.priceTo}
             currency={compare.currency}
             products={cartProducts.map((p) => ({
               id: p.id,

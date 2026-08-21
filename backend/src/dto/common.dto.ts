@@ -279,6 +279,12 @@ export class ResolveStockQueryResponseDto {
 
   @ApiProperty({ type: StockQueryTriedDto, isArray: true })
   tried!: StockQueryTriedDto[]
+
+  @ApiProperty({
+    example: 0,
+    description: 'Candidates dropped because the caller already has that listing.',
+  })
+  excluded!: number
 }
 
 export class ResolveStockResponseDto {
@@ -481,11 +487,6 @@ export class StockSkippedDto {
 
   @ApiPropertyOptional({ type: StockCoverageDto, nullable: true })
   coverage!: StockCoverageDto | null
-
-  @ApiProperty({
-    example: 'Stock needs at least two distinct years with prices in 2020-2026',
-  })
-  reason!: string
 }
 
 /** Multi-stock overview: GET /v1/analytics/compare */

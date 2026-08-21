@@ -43,6 +43,24 @@ type QueryTried = {
   lastYear: number | null
 }
 
+/**
+ * Why nothing was added. `resolved` is null for three different reasons and
+ * the old copy blamed the tickers for all of them — including the case where
+ * clickable, quoted candidates were sitting right below the message.
+ */
+function noResolutionMessage(result: QueryResponse): string {
+  if (result.tried.some((item) => item.available)) {
+    return 'Не удалось загрузить котировки автоматически. Выберите тикер из списка ниже.'
+  }
+  if (result.candidates.length > 0) {
+    return 'Нет котировок на MOEX и Yahoo по этим тикерам. Укажите тикер вручную.'
+  }
+  if ((result.excluded ?? 0) > 0) {
+    return 'Все найденные акции уже в вашем списке.'
+  }
+  return 'Не удалось найти акцию по этому описанию. Попробуйте иначе или укажите тикер.'
+}
+
 type QueryResponse = {
   resolved: {
     id: string
@@ -53,6 +71,8 @@ type QueryResponse = {
   } | null
   candidates: QueryCandidate[]
   tried: QueryTried[]
+  /** Candidates the backend dropped because we already have that listing. */
+  excluded?: number
 }
 
 interface AddCustomStockDialogProps {
@@ -188,14 +208,18 @@ export function AddCustomStockDialog({
   }
 
   const finishAdded = (detail: StockDetail, fallbackName?: string) => {
-    const name = customName.trim() || fallbackName?.trim() || detail.companyName.trim() || ''
-    const displayName = name || detail.symbol
+    // Only what the user typed becomes a stored override. Persisting the
+    // resolved company name here would pin it for good, so a later correction
+    // in the catalogue could never reach this browser.
+    const override = customName.trim()
+    const displayName =
+      override || fallbackName?.trim() || detail.companyName.trim() || detail.symbol
     onAdded(
       {
         id: detail.id,
         symbol: detail.symbol,
         exchange: detail.exchange,
-        ...(name ? { customName: name } : {}),
+        ...(override ? { customName: override } : {}),
       },
       {
         name: displayName,
@@ -290,11 +314,7 @@ export function AddCustomStockDialog({
 
     const resolved = result.resolved
     if (!resolved) {
-      throw new Error(
-        result.candidates.length > 0
-          ? 'Нет котировок на MOEX и Yahoo по этим тикерам. Укажите тикер вручную.'
-          : 'Не удалось найти акцию по этому описанию. Попробуйте иначе или укажите тикер.',
-      )
+      throw new Error(noResolutionMessage(result))
     }
 
     if (
