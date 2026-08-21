@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AddCustomStockDialog } from '../components/compare/AddCustomStockDialog'
 import {
   EquivalentsPanel,
@@ -7,7 +7,9 @@ import {
 } from '../components/compare/ComparePanels'
 import { GrowthChart } from '../components/compare/GrowthChart'
 import { HorizontalScroller } from '../components/compare/HorizontalScroller'
-import { ALL_EXCHANGES, StockPicker } from '../components/compare/StockPicker'
+import { type StockAddedNotice, StockAddedToast } from '../components/compare/StockAddedToast'
+import { ALL_EXCHANGES, type SkippedStock, StockPicker } from '../components/compare/StockPicker'
+import { formatMoney } from '../components/comparison/comparisonUtils'
 import type { CompareStock } from '../components/comparison/HeroComparison'
 import { Loader } from '../components/ui/Loader'
 import { Select } from '../components/ui/Select'
@@ -34,7 +36,9 @@ const YEARS = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR
 /** One-tap spans people actually reach for, all running to the present. */
 const PERIOD_PRESETS = [
   { label: 'С 1998', from: 1998 },
+  { label: 'С 2007', from: 2007 },
   { label: 'С Крыма', from: 2014 },
+  { label: 'С Ковида', from: 2020 },
   { label: 'СВО', from: 2022 },
   { label: 'За год', from: MAX_YEAR - 1 },
 ]
@@ -45,6 +49,7 @@ type CompareResponse = {
   currency: 'RUB' | 'USD'
   cart: { priceFrom: number; priceTo: number; growthPercent: number }
   stocks: CompareStock[]
+  skipped: SkippedStock[]
 }
 
 type CartProduct = {
@@ -106,16 +111,6 @@ function mergeCartProducts(fromCart: CartProduct[], toCart: CartProduct[]): Cart
   })
 }
 
-function money(amount: number, currency: 'RUB' | 'USD') {
-  const digits = Number.isInteger(amount) ? 0 : 2
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(amount)
-}
-
 interface ComparePageProps {
   currency: Currency
 }
@@ -135,6 +130,11 @@ export function ComparePage({ currency }: ComparePageProps) {
   const [customStocks, setCustomStocks] = useState<CustomStock[]>(loadCustomStocks)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [exchangeFilter, setExchangeFilter] = useState(ALL_EXCHANGES)
+  const [equivalentStockId, setEquivalentStockId] = useState<string | null>(null)
+  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null)
+  const [pinnedProductId, setPinnedProductId] = useState<string | null>(null)
+  const [addedNotice, setAddedNotice] = useState<StockAddedNotice | null>(null)
+  const dismissAddedNotice = useCallback(() => setAddedNotice(null), [])
   const customIdsKey = customStockIds(customStocks).join(',')
   const customIdSet = useMemo(() => new Set(customStockIds(customStocks)), [customStocks])
 
@@ -195,11 +195,14 @@ export function ComparePage({ currency }: ComparePageProps) {
       .then(async ([data, cartFrom, cartTo]) => {
         if (cancelled) return
 
-        setCompare(data)
+        setCompare({ ...data, skipped: data.skipped ?? [] })
         setCartProducts(mergeCartProducts(cartFrom, cartTo))
         setCustomStocks((prev) => {
-          const present = new Set(data.stocks.map((stock) => stock.id))
-          const kept = prev.filter((stock) => present.has(stock.id))
+          const known = new Set([
+            ...data.stocks.map((stock) => stock.id),
+            ...(data.skipped ?? []).map((stock) => stock.id),
+          ])
+          const kept = prev.filter((stock) => known.has(stock.id))
           return kept.length === prev.length ? prev : replaceCustomStocks(kept)
         })
         setSelectedIds((prev) => {
@@ -243,19 +246,33 @@ export function ComparePage({ currency }: ComparePageProps) {
     }
   }, [from, to, customIdsKey, currency])
 
+  const customNames = useMemo(
+    () =>
+      new Map(
+        customStocks.flatMap((stock) =>
+          stock.customName ? [[stock.id, stock.customName] as const] : [],
+        ),
+      ),
+    [customStocks],
+  )
+
   const displayStocks = useMemo(() => {
     if (!compare) return []
-    const names = new Map(
-      customStocks.flatMap((stock) =>
-        stock.customName ? [[stock.id, stock.customName] as const] : [],
-      ),
-    )
-    if (names.size === 0) return compare.stocks
+    if (customNames.size === 0) return compare.stocks
     return compare.stocks.map((stock) => {
-      const customName = names.get(stock.id)
+      const customName = customNames.get(stock.id)
       return customName ? { ...stock, companyName: customName } : stock
     })
-  }, [compare, customStocks])
+  }, [compare, customNames])
+
+  const displaySkipped = useMemo(() => {
+    if (!compare) return []
+    if (customNames.size === 0) return compare.skipped ?? []
+    return (compare.skipped ?? []).map((stock) => {
+      const customName = customNames.get(stock.id)
+      return customName ? { ...stock, companyName: customName } : stock
+    })
+  }, [compare, customNames])
 
   const visibleStocks = useMemo(
     () => stocksForExchange(displayStocks, exchangeFilter),
@@ -269,9 +286,11 @@ export function ComparePage({ currency }: ComparePageProps) {
 
   useEffect(() => {
     if (exchangeFilter === ALL_EXCHANGES) return
-    if (displayStocks.some((stock) => stock.exchange === exchangeFilter)) return
+    const listed = displayStocks.some((stock) => stock.exchange === exchangeFilter)
+    const skipped = displaySkipped.some((stock) => stock.exchange === exchangeFilter)
+    if (listed || skipped) return
     setExchangeFilter(ALL_EXCHANGES)
-  }, [displayStocks, exchangeFilter])
+  }, [displayStocks, displaySkipped, exchangeFilter])
 
   const existingListings = useMemo(() => {
     const listings = new Set<string>()
@@ -282,10 +301,13 @@ export function ComparePage({ currency }: ComparePageProps) {
   const existingIds = useMemo(() => {
     const ids = new Set<string>(customIdSet)
     for (const stock of displayStocks) ids.add(stock.id)
+    for (const stock of displaySkipped) ids.add(stock.id)
     return ids
-  }, [customIdSet, displayStocks])
+  }, [customIdSet, displayStocks, displaySkipped])
 
   const bestStock = useMemo(() => pickTopGrowthStock(selectedStocks), [selectedStocks])
+  const equivalentStock =
+    selectedStocks.find((stock) => stock.id === equivalentStockId) ?? bestStock
 
   const fromOptions = useMemo(
     () => YEARS.map((y) => ({ value: y, label: String(y), disabled: y >= to })),
@@ -420,6 +442,9 @@ export function ComparePage({ currency }: ComparePageProps) {
             onExchangeChange={applyExchangeFilter}
             onAdd={() => setDialogOpen(true)}
             customIds={customIdSet}
+            skipped={displaySkipped}
+            fromYear={from}
+            toYear={to}
             onRemoveCustom={(id) => {
               setCustomStocks(removeCustomStock(id))
               setSelectedIds((prev) => {
@@ -437,63 +462,87 @@ export function ComparePage({ currency }: ComparePageProps) {
             cartTo={compare.cart.priceTo}
             stocks={selectedStocks}
             histories={chartHistories}
+            currency={compare.currency}
+            onDeselectStock={toggleStock}
           />
 
-          {bestStock ? (
-            <EquivalentsPanel
-              stock={bestStock}
-              products={cartProducts.map((p) => ({
-                id: p.id,
-                name: p.name,
-                price: p.priceTo,
-              }))}
-            />
-          ) : (
-            <aside className="compare-panel">
-              <div className="compare-panel-header">
-                <h3>На что хватило бы сегодня?</h3>
-              </div>
-              <p className="muted">Выберите акцию, чтобы посчитать эквиваленты.</p>
-            </aside>
-          )}
+          <EquivalentsPanel
+            stocks={selectedStocks}
+            selectedId={equivalentStock?.id ?? null}
+            onSelect={setEquivalentStockId}
+            cartPrice={compare.cart.priceTo}
+            currency={compare.currency}
+            products={cartProducts.map((p) => ({
+              id: p.id,
+              name: p.name,
+              price: p.priceTo,
+            }))}
+          />
         </div>
       )}
 
       {compare && selectedStocks.length > 0 && (
-        <RankingRow stocks={selectedStocks} cartGrowthPercent={compare.cart.growthPercent} />
+        <RankingRow
+          stocks={selectedStocks}
+          cartGrowthPercent={compare.cart.growthPercent}
+          currency={compare.currency}
+          cartFrom={compare.cart.priceFrom}
+          cartTo={compare.cart.priceTo}
+        />
       )}
 
       {cartProducts.length > 0 && (
         <section className="basket-section" aria-label="Состав корзины">
-          <h3>Корзина скуфа: как выросла за период?</h3>
+          <h3>
+            Корзина скуфа: как выросла за период?{' '}
+            <span className="muted">
+              {from}–{to}
+            </span>
+          </h3>
           <HorizontalScroller trackClassName="basket-strip" label="корзину">
-            {cartProducts.map((p) => (
-              <div
-                key={p.id}
-                className={`basket-strip-item${p.priceTo === null ? ' card-muted' : ''}`}
-              >
-                {p.imageUrl && (
-                  <img src={p.imageUrl} alt="" width={56} height={56} loading="lazy" />
-                )}
-                <span className="name">{p.name}</span>
-                {p.priceTo !== null ? (
-                  <span className="price">{money(p.priceTo, p.currency)}</span>
-                ) : (
-                  <span className="price muted-price">нет данных</span>
-                )}
-                {p.growthPercent !== null ? (
-                  <span
-                    className={`basket-growth ${
-                      p.growthPercent >= 0 ? 'growth' : 'growth-negative'
-                    }`}
-                  >
-                    {formatGrowth(p.growthPercent)}
-                  </span>
-                ) : (
-                  <span className="basket-growth muted-price">—</span>
-                )}
-              </div>
-            ))}
+            {cartProducts.map((p) => {
+              const revealed = (pinnedProductId ?? hoveredProductId) === p.id
+              const showChange = revealed && p.priceFrom !== null && p.priceTo !== null
+              return (
+                <button
+                  type="button"
+                  key={p.id}
+                  className={`basket-strip-item${p.priceTo === null ? ' card-muted' : ''}`}
+                  onPointerEnter={() => setHoveredProductId(p.id)}
+                  onPointerLeave={() =>
+                    setHoveredProductId((current) => (current === p.id ? null : current))
+                  }
+                  onClick={() => setPinnedProductId((current) => (current === p.id ? null : p.id))}
+                >
+                  {p.imageUrl && (
+                    <img src={p.imageUrl} alt="" width={56} height={56} loading="lazy" />
+                  )}
+                  <span className="name">{p.name}</span>
+                  {showChange ? (
+                    <span className="price-change">
+                      {formatMoney(p.priceFrom as number, p.currency)}
+                      <span aria-hidden="true"> → </span>
+                      {formatMoney(p.priceTo as number, p.currency)}
+                    </span>
+                  ) : p.priceTo !== null ? (
+                    <span className="price">{formatMoney(p.priceTo, p.currency)}</span>
+                  ) : (
+                    <span className="price muted-price">нет данных</span>
+                  )}
+                  {p.growthPercent !== null ? (
+                    <span
+                      className={`basket-growth ${
+                        p.growthPercent >= 0 ? 'growth' : 'growth-negative'
+                      }`}
+                    >
+                      {formatGrowth(p.growthPercent)}
+                    </span>
+                  ) : (
+                    <span className="basket-growth muted-price">—</span>
+                  )}
+                </button>
+              )
+            })}
           </HorizontalScroller>
         </section>
       )}
@@ -503,11 +552,13 @@ export function ComparePage({ currency }: ComparePageProps) {
         onClose={() => setDialogOpen(false)}
         existingListings={existingListings}
         existingIds={existingIds}
-        onAdded={(stock) => {
+        onAdded={(stock, notice) => {
           setCustomStocks(saveCustomStock(stock))
           setSelectedIds((prev) => new Set(prev).add(stock.id))
+          setAddedNotice(notice)
         }}
       />
+      <StockAddedToast notice={addedNotice} onDismiss={dismissAddedNotice} />
     </div>
   )
 }

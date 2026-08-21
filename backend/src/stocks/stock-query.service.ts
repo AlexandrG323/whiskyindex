@@ -55,42 +55,54 @@ export class StockQueryService {
     )
 
     const candidates = parseCandidates(await this.openRouter.chatJson(SYSTEM_PROMPT, query))
-    const tried: StockQueryTriedDto[] = []
 
-    for (const candidate of candidates) {
-      if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
-        continue
-      }
+    const probes = await Promise.all(
+      candidates.map(async (candidate) => {
+        if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
+          return { candidate, excluded: true as const }
+        }
+        const probe = await this.stockImport.probeSymbol(
+          candidate.symbol,
+          sourceFromExchange(candidate.exchange),
+        )
+        return { candidate, excluded: false as const, probe }
+      }),
+    )
 
-      const source = sourceFromExchange(candidate.exchange)
-      const probe = await this.stockImport.probeSymbol(candidate.symbol, source)
-      tried.push({
-        symbol: candidate.symbol,
-        exchange: candidate.exchange,
-        available: probe.available,
-      })
+    const tried: StockQueryTriedDto[] = probes.flatMap((item) =>
+      item.excluded
+        ? []
+        : [
+            {
+              symbol: item.candidate.symbol,
+              exchange: item.candidate.exchange,
+              available: item.probe.available,
+              firstYear: item.probe.firstYear,
+              lastYear: item.probe.lastYear,
+            },
+          ],
+    )
 
-      if (!probe.available) {
-        continue
-      }
+    for (const item of probes) {
+      if (item.excluded || !item.probe.available) continue
 
       const resolved = await this.stocksService.resolve({
-        symbol: candidate.symbol,
-        exchange: candidate.exchange,
+        symbol: item.candidate.symbol,
+        exchange: item.candidate.exchange,
       })
 
       if (resolved.importStatus === 'failed') {
         this.logger.warn(
-          `Resolve failed after successful probe for ${candidate.symbol} ${candidate.exchange}`,
+          `Resolve failed after successful probe for ${item.candidate.symbol} ${item.candidate.exchange}`,
         )
         continue
       }
 
-      const companyName = probe.companyName || candidate.companyName
+      const companyName = item.probe.companyName || item.candidate.companyName
       const payload: ResolveQueryStockDto = {
         id: resolved.id,
         symbol: resolved.symbol,
-        exchange: candidate.exchange,
+        exchange: item.candidate.exchange,
         importStatus: resolved.importStatus,
         imageUrl: resolved.imageUrl,
         ...(companyName ? { companyName } : {}),

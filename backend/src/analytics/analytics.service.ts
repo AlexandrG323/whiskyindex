@@ -10,6 +10,7 @@ import {
   PurchasingPowerDto,
   StockCompareItemDto,
   StockPriceRangeDto,
+  StockSkippedDto,
 } from '../dto/common.dto'
 import { ProductsService } from '../products/products.service'
 import { StocksService } from '../stocks/stocks.service'
@@ -51,16 +52,30 @@ export class AnalyticsService {
     )
 
     const stocks: StockCompareItemDto[] = []
+    const skipped: StockSkippedDto[] = []
     for (let i = 0; i < settled.length; i++) {
       const result = settled[i]
       if (result.status === 'fulfilled') {
         stocks.push(result.value)
-      } else {
-        this.logger.warn(
-          `Skipping stock ${ids[i]} in compare overview: ${
-            result.reason instanceof Error ? result.reason.message : String(result.reason)
-          }`,
-        )
+        continue
+      }
+
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason)
+      this.logger.warn(`Skipping stock ${ids[i]} in compare overview: ${reason}`)
+
+      try {
+        const detail = await this.stocks.getById(ids[i])
+        skipped.push({
+          id: detail.id,
+          symbol: detail.symbol,
+          companyName: detail.companyName,
+          exchange: detail.exchange,
+          imageUrl: detail.imageUrl,
+          coverage: detail.coverage,
+          reason,
+        })
+      } catch {
+        // Unknown id — nothing to show in the picker.
       }
     }
 
@@ -71,6 +86,7 @@ export class AnalyticsService {
       cart,
       jameson,
       stocks,
+      skipped,
     }
   }
 
@@ -162,19 +178,45 @@ export class AnalyticsService {
     to: number,
     currency: 'rub' | 'usd',
   ): Promise<StockCompareItemDto> {
-    const range = await this.buildStockPriceRange(id, from, to, currency)
+    const [displayEnds, rubEnds] = await Promise.all([
+      this.stocks.getEndpointPrices(id, from, to, currency),
+      currency === 'usd'
+        ? this.stocks.getEndpointPrices(id, from, to, 'rub')
+        : Promise.resolve(null),
+    ])
 
-    // Align cart/Jameson with the years we actually used for the stock
-    const { cartFrom, cartTo, jamesonFrom, jamesonTo } = await this.loadCartAndJameson(
-      range.priceFromYear,
-      range.priceToYear,
-      currency,
-    )
+    const [displayBasket, rubBasket] = await Promise.all([
+      this.loadCartAndJameson(displayEnds.fromYear, displayEnds.toYear, currency),
+      rubEnds
+        ? this.loadCartAndJameson(rubEnds.fromYear, rubEnds.toYear, 'rub')
+        : Promise.resolve(null),
+    ])
+
+    const range = this.toStockPriceRange(displayEnds)
+
+    const whiskyEnds = rubEnds ?? displayEnds
+    const whiskyBasket = rubBasket ?? displayBasket
 
     return {
       ...range,
-      atFrom: this.purchasingPower(range.priceFrom, cartFrom, jamesonFrom),
-      atTo: this.purchasingPower(range.priceTo, cartTo, jamesonTo),
+      atFrom: this.purchasingPower(
+        displayEnds.priceFrom,
+        displayBasket.cartFrom,
+        displayBasket.jamesonFrom,
+      ),
+      atTo: this.purchasingPower(
+        displayEnds.priceTo,
+        displayBasket.cartTo,
+        displayBasket.jamesonTo,
+      ),
+      whiskyShare: this.roundRatio(
+        this.whiskyShare(
+          whiskyEnds.priceFrom,
+          whiskyEnds.priceTo,
+          whiskyBasket.cartFrom,
+          whiskyBasket.jamesonTo,
+        ),
+      ),
     }
   }
 
@@ -189,7 +231,12 @@ export class AnalyticsService {
     currency: 'rub' | 'usd',
   ): Promise<StockPriceRangeDto> {
     const endpoints = await this.stocks.getEndpointPrices(id, from, to, currency)
+    return this.toStockPriceRange(endpoints)
+  }
 
+  private toStockPriceRange(
+    endpoints: Awaited<ReturnType<StocksService['getEndpointPrices']>>,
+  ): StockPriceRangeDto {
     return {
       id: endpoints.id,
       symbol: endpoints.symbol,
@@ -202,6 +249,18 @@ export class AnalyticsService {
       priceTo: this.roundMoney(endpoints.priceTo),
       growthPercent: this.growthPercent(endpoints.priceFrom, endpoints.priceTo),
     }
+  }
+
+  /** Cart-sized P&L in today’s Jameson bottles. Uses unrounded prices. */
+  private whiskyShare(
+    priceFrom: number,
+    priceTo: number,
+    cartFrom: number,
+    jamesonTo: number,
+  ): number {
+    if (priceFrom === 0 || jamesonTo <= 0) return 0
+    const shares = cartFrom / priceFrom
+    return (shares * (priceTo - priceFrom)) / jamesonTo
   }
 
   async exchangeRateByYear(year: number): Promise<number> {

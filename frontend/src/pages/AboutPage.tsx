@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { GitHubIcon } from '../components/ui/icons'
 import './about.css'
 
 const SOURCES = [
@@ -63,6 +64,18 @@ export function AboutPage() {
           </article>
         ))}
       </section>
+
+      <p className="about-author">
+        Автор: Александр Гончаренко
+        <a
+          href="https://github.com/AlexandrG323"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="GitHub Александра Гончаренко"
+        >
+          <GitHubIcon />
+        </a>
+      </p>
 
       <section className="about-sources" aria-label="Источники данных">
         <div className="about-sources-head">

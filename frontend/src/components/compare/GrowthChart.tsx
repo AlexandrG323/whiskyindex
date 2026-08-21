@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatMoney } from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
 
 export type HistorySeries = {
@@ -15,6 +16,8 @@ interface GrowthChartProps {
   cartTo: number
   stocks: CompareStock[]
   histories: HistorySeries[]
+  currency: 'RUB' | 'USD'
+  onDeselectStock?: (id: string) => void
 }
 
 const STOCK_COLORS = [
@@ -33,13 +36,14 @@ const STOCK_COLORS = [
 function toGrowthSeries(
   prices: { year: number; amount: number }[],
   baselineYear: number,
-): { year: number; growth: number }[] {
+): { year: number; growth: number; amount: number }[] {
   if (prices.length === 0) return []
   const sorted = [...prices].sort((a, b) => a.year - b.year)
   const baseline = sorted.find((p) => p.year >= baselineYear)?.amount ?? sorted[0].amount
   if (baseline === 0) return []
   return sorted.map((p) => ({
     year: p.year,
+    amount: p.amount,
     growth: ((p.amount - baseline) / baseline) * 100,
   }))
 }
@@ -73,11 +77,15 @@ export function GrowthChart({
   cartTo,
   stocks,
   histories,
+  currency,
+  onDeselectStock,
 }: GrowthChartProps) {
   const frameRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ width: 640, height: 280 })
   const [hoverYear, setHoverYear] = useState<number | null>(null)
+  const [pinned, setPinned] = useState(false)
+  const [legendHoverId, setLegendHoverId] = useState<string | null>(null)
 
   const series = useMemo(() => {
     const yearSpan = Math.max(toYear - fromYear, 1)
@@ -182,6 +190,11 @@ export function GrowthChart({
     setHoverYear(Math.min(toYear, Math.max(fromYear, Math.round(raw))))
   }
 
+  const unpin = () => {
+    setPinned(false)
+    setHoverYear(null)
+  }
+
   const readouts =
     hoverYear === null
       ? []
@@ -189,10 +202,29 @@ export function GrowthChart({
           .flatMap((line) => {
             const point = line.points.find((p) => p.year === hoverYear)
             return point
-              ? [{ id: line.id, label: line.label, color: line.color, growth: point.growth }]
+              ? [
+                  {
+                    id: line.id,
+                    label: line.label,
+                    color: line.color,
+                    growth: point.growth,
+                    amount: point.amount,
+                  },
+                ]
               : []
           })
           .sort((a, b) => b.growth - a.growth)
+
+  const focusedReadouts =
+    legendHoverId === null ? readouts : readouts.filter((item) => item.id === legendHoverId)
+
+  const shownReadouts = pinned ? focusedReadouts : focusedReadouts.slice(0, TOOLTIP_LIMIT)
+
+  const legendLine = legendHoverId
+    ? growthLines.find((line) => line.id === legendHoverId)
+    : undefined
+  const legendFirst = legendLine?.points[0]
+  const legendLast = legendLine?.points[legendLine.points.length - 1]
 
   const hoverX = hoverYear === null ? 0 : xFor(hoverYear)
   // Flip the tooltip to whichever side has room instead of measuring it.
@@ -219,9 +251,17 @@ export function GrowthChart({
               aria-label={`Рост с ${fromYear} по ${toYear}`}
               // Move-to-inspect for mice; tap-to-inspect for touch, where
               // reacting to every move would fight the page scroll.
-              onPointerMove={(e) => e.pointerType === 'mouse' && pickYear(e.clientX)}
-              onPointerDown={(e) => pickYear(e.clientX)}
-              onPointerLeave={() => setHoverYear(null)}
+              onPointerMove={(e) => {
+                if (pinned) return
+                if (e.pointerType === 'mouse') pickYear(e.clientX)
+              }}
+              onPointerDown={(e) => {
+                pickYear(e.clientX)
+                setPinned(true)
+              }}
+              onPointerLeave={() => {
+                if (!pinned) setHoverYear(null)
+              }}
             >
               {yTicks.map((tick, index) => (
                 <g key={tick}>
@@ -262,20 +302,23 @@ export function GrowthChart({
                 const d = line.points
                   .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xFor(p.year)} ${yFor(p.growth)}`)
                   .join(' ')
+                const dimmed = legendHoverId !== null && legendHoverId !== line.id
+                const focused = legendHoverId === line.id
                 return (
                   <path
                     key={line.id}
                     d={d}
                     fill="none"
                     stroke={line.color}
-                    strokeWidth={line.id === 'cart' ? 2.5 : 2}
+                    strokeWidth={focused ? 3 : line.id === 'cart' ? 2.5 : 2}
+                    strokeOpacity={dimmed ? 0.18 : 1}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                   />
                 )
               })}
 
-              {hoverYear !== null && readouts.length > 0 && (
+              {hoverYear !== null && focusedReadouts.length > 0 && (
                 <g pointerEvents="none">
                   <line
                     x1={hoverX}
@@ -286,12 +329,12 @@ export function GrowthChart({
                     strokeWidth={1}
                     strokeDasharray="3 3"
                   />
-                  {readouts.map((r) => (
+                  {focusedReadouts.map((r) => (
                     <circle
                       key={r.id}
                       cx={hoverX}
                       cy={yFor(r.growth)}
-                      r={3}
+                      r={legendHoverId === r.id ? 4.5 : 3}
                       fill={r.color}
                       stroke="#0b0b0d"
                       strokeWidth={1.5}
@@ -301,29 +344,66 @@ export function GrowthChart({
               )}
             </svg>
 
-            {hoverYear !== null && readouts.length > 0 && (
+            {legendLine && legendFirst && legendLast && hoverYear === null && (
+              <div className="growth-chart-tooltip growth-chart-legend-stats" aria-hidden="true">
+                <p className="growth-chart-tooltip-year">{legendLine.label}</p>
+                <ul>
+                  <li>
+                    <span
+                      className="growth-chart-swatch"
+                      style={{ background: legendLine.color }}
+                    />
+                    <span className="growth-chart-tooltip-value">
+                      {formatPercent(legendLast.growth)}
+                    </span>
+                    <span className="growth-chart-tooltip-price">
+                      {formatMoney(legendFirst.amount, currency)}
+                      <span aria-hidden="true"> → </span>
+                      {formatMoney(legendLast.amount, currency)}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {hoverYear !== null && focusedReadouts.length > 0 && (
               <div
-                className="growth-chart-tooltip"
+                className={`growth-chart-tooltip${pinned ? ' is-pinned' : ''}`}
                 style={
                   tooltipOnLeft
                     ? { right: `${((width - hoverX) / width) * 100}%`, marginRight: '0.6rem' }
                     : { left: `${(hoverX / width) * 100}%`, marginLeft: '0.6rem' }
                 }
-                aria-hidden="true"
+                aria-hidden={!pinned}
               >
-                <p className="growth-chart-tooltip-year">{hoverYear}</p>
+                <div className="growth-chart-tooltip-head">
+                  <p className="growth-chart-tooltip-year">{hoverYear}</p>
+                  {pinned && (
+                    <button
+                      type="button"
+                      className="growth-chart-tooltip-close"
+                      aria-label="Закрыть"
+                      onClick={unpin}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
                 <ul>
-                  {readouts.slice(0, TOOLTIP_LIMIT).map((r) => (
+                  {shownReadouts.map((r) => (
                     <li key={r.id}>
                       <span className="growth-chart-swatch" style={{ background: r.color }} />
                       <span className="growth-chart-tooltip-label">{r.label}</span>
                       <span className="growth-chart-tooltip-value">{formatPercent(r.growth)}</span>
+                      <span className="growth-chart-tooltip-price">
+                        {formatMoney(r.amount, currency)}
+                      </span>
                     </li>
                   ))}
                 </ul>
-                {readouts.length > TOOLTIP_LIMIT && (
+                {!pinned && focusedReadouts.length > TOOLTIP_LIMIT && (
                   <p className="growth-chart-tooltip-more">
-                    и ещё {readouts.length - TOOLTIP_LIMIT}
+                    и ещё {focusedReadouts.length - TOOLTIP_LIMIT} · нажмите, чтобы открыть все
                   </p>
                 )}
               </div>
@@ -331,12 +411,34 @@ export function GrowthChart({
           </div>
 
           <ul className="growth-chart-legend">
-            {growthLines.map((line) => (
-              <li key={line.id}>
-                <span className="growth-chart-swatch" style={{ background: line.color }} />
-                {line.label}
-              </li>
-            ))}
+            {growthLines.map((line) => {
+              const isCart = line.id === 'cart'
+              const hot = legendHoverId === line.id
+              return (
+                <li key={line.id}>
+                  <button
+                    type="button"
+                    className={`growth-chart-legend-item${isCart ? ' is-cart' : ''}${
+                      hot ? ' is-hot' : ''
+                    }`}
+                    aria-label={isCart ? line.label : `Убрать ${line.label} из сравнения`}
+                    title={isCart ? undefined : 'Убрать из сравнения'}
+                    onPointerEnter={() => setLegendHoverId(line.id)}
+                    onPointerLeave={() =>
+                      setLegendHoverId((current) => (current === line.id ? null : current))
+                    }
+                    onClick={() => {
+                      if (isCart) return
+                      setLegendHoverId(null)
+                      onDeselectStock?.(line.id)
+                    }}
+                  >
+                    <span className="growth-chart-swatch" style={{ background: line.color }} />
+                    {line.label}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}

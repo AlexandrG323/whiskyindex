@@ -2,8 +2,8 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const DEFAULT_MODEL = 'openai/gpt-4o-mini'
-const REQUEST_TIMEOUT_MS = 20_000
+const DEFAULT_MODEL = 'openai/gpt-5.6-luna'
+const REQUEST_TIMEOUT_MS = 45_000
 
 type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -53,7 +53,8 @@ export class OpenRouterClient {
         body: JSON.stringify({
           model,
           temperature: 0.2,
-          max_tokens: 400,
+          max_tokens: 2000,
+          reasoning: { effort: 'low' },
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: system },

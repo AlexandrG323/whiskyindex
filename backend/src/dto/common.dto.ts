@@ -239,6 +239,12 @@ export class StockQueryTriedDto {
 
   @ApiProperty({ example: true })
   available!: boolean
+
+  @ApiPropertyOptional({ example: 1999, nullable: true, type: Number })
+  firstYear!: number | null
+
+  @ApiPropertyOptional({ example: 2018, nullable: true, type: Number })
+  lastYear!: number | null
 }
 
 export class ResolveQueryStockDto {
@@ -447,6 +453,39 @@ export class StockCompareItemDto extends StockPriceRangeDto {
 
   @ApiProperty({ type: PurchasingPowerDto })
   atTo!: PurchasingPowerDto
+
+  @ApiProperty({
+    example: 371.45,
+    description:
+      'Cart-sized P&L in today’s Jameson bottles, always computed in RUB so the count does not change with the UI currency.',
+  })
+  whiskyShare!: number
+}
+
+/** A requested stock that could not be compared in the selected range. */
+export class StockSkippedDto {
+  @ApiProperty({ example: '11111111-1111-4111-8111-111111111006' })
+  id!: string
+
+  @ApiProperty({ example: 'RZSB' })
+  symbol!: string
+
+  @ApiProperty({ example: 'Райффайзен Банк' })
+  companyName!: string
+
+  @ApiProperty({ example: 'MOEX' })
+  exchange!: string
+
+  @ApiPropertyOptional({ example: null, nullable: true, type: String })
+  imageUrl!: string | null
+
+  @ApiPropertyOptional({ type: StockCoverageDto, nullable: true })
+  coverage!: StockCoverageDto | null
+
+  @ApiProperty({
+    example: 'Stock needs at least two distinct years with prices in 2020-2026',
+  })
+  reason!: string
 }
 
 /** Multi-stock overview: GET /v1/analytics/compare */
@@ -468,6 +507,9 @@ export class CompareCartAndStocksDto {
 
   @ApiProperty({ type: StockCompareItemDto, isArray: true })
   stocks!: StockCompareItemDto[]
+
+  @ApiProperty({ type: StockSkippedDto, isArray: true })
+  skipped!: StockSkippedDto[]
 }
 
 /** One stock deep-dive: GET /v1/analytics/compare/:id */

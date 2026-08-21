@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { fetchJson } from '../../lib/api'
 import { type CustomStock, listingKey } from '../../lib/customStocks'
+import type { StockAddedNotice } from './StockAddedToast'
 
 const POPULAR_EXCHANGES = ['MOEX', 'NASDAQ', 'NYSE', 'LSE'] as const
 
@@ -14,6 +15,7 @@ type ResolveResponse = {
   id: string
   symbol: string
   importStatus: ImportStatus
+  imageUrl?: string | null
 }
 
 type StockDetail = {
@@ -21,6 +23,8 @@ type StockDetail = {
   symbol: string
   exchange: string
   importStatus: ImportStatus
+  companyName: string
+  imageUrl: string | null
 }
 
 type QueryCandidate = {
@@ -35,6 +39,8 @@ type QueryTried = {
   symbol: string
   exchange: string
   available: boolean
+  firstYear: number | null
+  lastYear: number | null
 }
 
 type QueryResponse = {
@@ -52,7 +58,7 @@ type QueryResponse = {
 interface AddCustomStockDialogProps {
   open: boolean
   onClose: () => void
-  onAdded: (stock: CustomStock) => void
+  onAdded: (stock: CustomStock, notice: StockAddedNotice) => void
   /** Listings already in the picker, keyed as SYMBOL|EXCHANGE. */
   existingListings: ReadonlySet<string>
   /** Stock ids already shown (curated + custom) — same listing resolves to the same id. */
@@ -76,8 +82,28 @@ async function waitUntilReady(id: string, signal: AbortSignal): Promise<StockDet
   throw new Error('Импорт занимает слишком много времени. Попробуйте позже.')
 }
 
+async function loadReadyDetail(
+  id: string,
+  importStatus: ImportStatus,
+  signal: AbortSignal,
+): Promise<StockDetail> {
+  if (importStatus === 'failed') {
+    throw new Error('Не удалось загрузить котировки для этого тикера.')
+  }
+  if (importStatus !== 'ready') {
+    return waitUntilReady(id, signal)
+  }
+  return fetchJson<StockDetail>(`/api/v1/stocks/${id}`, { signal })
+}
+
 function confidenceLabel(value: number) {
   return `${Math.round(value * 100)}%`
+}
+
+function coverageLabel(firstYear: number | null, lastYear: number | null) {
+  if (firstYear === null || lastYear === null) return null
+  if (firstYear === lastYear) return String(firstYear)
+  return `${firstYear}–${lastYear}`
 }
 
 export function AddCustomStockDialog({
@@ -114,9 +140,9 @@ export function AddCustomStockDialog({
   }, [exchange])
 
   const triedByListing = useMemo(() => {
-    const map = new Map<string, boolean>()
+    const map = new Map<string, QueryTried>()
     for (const item of tried) {
-      map.set(listingKey(item.symbol, item.exchange), item.available)
+      map.set(listingKey(item.symbol, item.exchange), item)
     }
     return map
   }, [tried])
@@ -162,37 +188,39 @@ export function AddCustomStockDialog({
     })
   }
 
-  const finishAdded = (
-    id: string,
-    nextSymbol: string,
-    nextExchange: string,
-    fallbackName?: string,
-  ) => {
-    const name = customName.trim() || fallbackName?.trim() || ''
-    onAdded({
-      id,
-      symbol: nextSymbol,
-      exchange: nextExchange,
-      ...(name ? { customName: name } : {}),
-    })
+  const finishAdded = (detail: StockDetail, fallbackName?: string) => {
+    const name = customName.trim() || fallbackName?.trim() || detail.companyName.trim() || ''
+    const displayName = name || detail.symbol
+    onAdded(
+      {
+        id: detail.id,
+        symbol: detail.symbol,
+        exchange: detail.exchange,
+        ...(name ? { customName: name } : {}),
+      },
+      {
+        name: displayName,
+        symbol: detail.symbol,
+        exchange: detail.exchange,
+        imageUrl: detail.imageUrl,
+      },
+    )
     onClose()
   }
 
-  const submitTicker = async (signal: AbortSignal) => {
-    const nextSymbol = symbol.trim().toUpperCase()
-    const nextExchange = exchange.trim().toUpperCase()
-    if (!nextSymbol || !nextExchange) {
-      setError('Укажите тикер и биржу.')
-      return
-    }
+  const addListing = async (
+    nextSymbol: string,
+    nextExchange: string,
+    signal: AbortSignal,
+    fallbackName?: string,
+  ) => {
     if (existingListings.has(listingKey(nextSymbol, nextExchange))) {
-      setError(`Акция ${nextSymbol} на ${nextExchange} уже в списке.`)
-      return
+      throw new Error(`Акция ${nextSymbol} на ${nextExchange} уже в списке.`)
     }
 
     setSubmitting(true)
     setError(null)
-    setStatus('Добавляем…')
+    setStatus(`Добавляем ${nextSymbol}…`)
 
     const resolved = await fetchJson<ResolveResponse>('/api/v1/stocks/resolve', {
       method: 'POST',
@@ -204,14 +232,29 @@ export function AddCustomStockDialog({
     if (existingIds.has(resolved.id)) {
       throw new Error(`Акция ${nextSymbol} на ${nextExchange} уже в списке.`)
     }
-    if (resolved.importStatus === 'failed') {
-      throw new Error('Не удалось загрузить котировки для этого тикера.')
-    }
-    if (resolved.importStatus !== 'ready') {
-      await waitUntilReady(resolved.id, signal)
-    }
 
-    finishAdded(resolved.id, resolved.symbol, nextExchange)
+    const detail = await loadReadyDetail(resolved.id, resolved.importStatus, signal)
+    finishAdded(detail, fallbackName)
+  }
+
+  const submitTicker = async (signal: AbortSignal) => {
+    const nextSymbol = symbol.trim().toUpperCase()
+    const nextExchange = exchange.trim().toUpperCase()
+    if (!nextSymbol || !nextExchange) {
+      setError('Укажите тикер и биржу.')
+      return
+    }
+    await addListing(nextSymbol, nextExchange, signal)
+  }
+
+  const catchSubmit = (cause: unknown) => {
+    if (cause instanceof DOMException && cause.name === 'AbortError') return
+    const message = cause instanceof Error ? cause.message : String(cause)
+    setError(
+      message.includes('→') ? 'Не удалось добавить акцию. Проверьте тикер и биржу.' : message,
+    )
+    setStatus(null)
+    setSubmitting(false)
   }
 
   const submitQuery = async (signal: AbortSignal) => {
@@ -226,7 +269,7 @@ export function AddCustomStockDialog({
     setCandidates([])
     setTried([])
     setStatus('Ищем кандидатов…')
-    const probeHint = window.setTimeout(() => setStatus('Проверяем котировки…'), 2500)
+    const probeHint = window.setTimeout(() => setStatus('Проверяем котировки…'), 4000)
 
     let result: QueryResponse
     try {
@@ -264,28 +307,28 @@ export function AddCustomStockDialog({
     }
 
     setStatus(`Добавляем ${resolved.symbol}…`)
-    if (resolved.importStatus !== 'ready') {
-      await waitUntilReady(resolved.id, signal)
-    }
-
-    finishAdded(resolved.id, resolved.symbol, resolved.exchange, resolved.companyName)
+    const detail = await loadReadyDetail(resolved.id, resolved.importStatus, signal)
+    finishAdded(detail, resolved.companyName)
   }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     const abort = new AbortController()
-
     try {
       if (mode === 'query') await submitQuery(abort.signal)
       else await submitTicker(abort.signal)
     } catch (cause: unknown) {
-      if (cause instanceof DOMException && cause.name === 'AbortError') return
-      const message = cause instanceof Error ? cause.message : String(cause)
-      setError(
-        message.includes('→') ? 'Не удалось добавить акцию. Проверьте тикер и биржу.' : message,
-      )
-      setStatus(null)
-      setSubmitting(false)
+      catchSubmit(cause)
+    }
+  }
+
+  const pickCandidate = async (candidate: QueryCandidate) => {
+    if (submitting) return
+    const abort = new AbortController()
+    try {
+      await addListing(candidate.symbol, candidate.exchange, abort.signal, candidate.companyName)
+    } catch (cause: unknown) {
+      catchSubmit(cause)
     }
   }
 
@@ -432,18 +475,32 @@ export function AddCustomStockDialog({
           <ul className="stock-dialog-candidates">
             {candidates.map((candidate) => {
               const key = listingKey(candidate.symbol, candidate.exchange)
-              const available = triedByListing.get(key)
+              const probe = triedByListing.get(key)
+              const available = probe?.available === true
+              const years =
+                probe?.available === true ? coverageLabel(probe.firstYear, probe.lastYear) : null
               return (
-                <li
-                  key={key}
-                  data-available={
-                    available === true ? 'yes' : available === false ? 'no' : 'unknown'
-                  }
-                >
-                  <span>
-                    {candidate.symbol} · {candidate.exchange}
-                  </span>
-                  <span>{confidenceLabel(candidate.confidence)}</span>
+                <li key={key} data-available={available ? 'yes' : 'no'}>
+                  {available ? (
+                    <button
+                      type="button"
+                      className="stock-dialog-chip"
+                      disabled={submitting}
+                      onClick={() => pickCandidate(candidate)}
+                    >
+                      <span className="stock-dialog-chip-listing">
+                        {candidate.symbol} · {candidate.exchange}
+                      </span>
+                      {years && <span className="stock-dialog-chip-years">{years}</span>}
+                    </button>
+                  ) : (
+                    <>
+                      <span>
+                        {candidate.symbol} · {candidate.exchange}
+                      </span>
+                      <span>{confidenceLabel(candidate.confidence)}</span>
+                    </>
+                  )}
                 </li>
               )
             })}

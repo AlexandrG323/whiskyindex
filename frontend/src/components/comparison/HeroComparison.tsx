@@ -15,6 +15,7 @@ export type CompareStock = {
   priceTo: number
   growthPercent: number
   atFrom: { sharesPerCart: number }
+  whiskyShare: number
 }
 
 interface HeroComparisonProps {
