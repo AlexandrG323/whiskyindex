@@ -25,7 +25,8 @@ npm run lint          # Biome; errors and warnings fail
 npm run lint:fix
 npm run typecheck     # tsc --noEmit in both workspaces
 npm run check         # lint:fix + typecheck (same as pre-push)
-npm run db:seed       # re-apply schema + seed (needs Postgres up)
+npm run db:seed       # re-apply schema + seed to local Docker Postgres
+npm run db:seed:prod  # same, against DATABASE_URL (production; confirmation)
 ```
 
 Local run: Postgres via `docker compose up -d db`, then `npm run start:dev` in `backend/` and `npm run dev` in `frontend/`. Full stack: `docker compose up --build` (UI `:5173`, API `:3000`).

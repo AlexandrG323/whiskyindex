@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
-# Apply schema + seed (idempotent).
-# Uses DATABASE_URL from repo-root .env when set (e.g. production Neon);
-# otherwise the running Docker Postgres.
+# Apply schema + seed (idempotent) to local Docker Postgres.
+# Production: ./db/seed-prod.sh (npm run db:seed:prod).
 # Usage (from repo root): ./db/seed.sh
 
 set -eu
@@ -10,6 +9,9 @@ ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 COMPOSE_FILE="${ROOT}/docker-compose.yml"
 INIT_DIR="${ROOT}/db/init"
 ENV_FILE="${ROOT}/.env"
+
+# Explicit remote URL from seed-prod.sh. Never take DATABASE_URL from .env here.
+REMOTE_URL="${SEED_DATABASE_URL:-}"
 
 if [ -f "$ENV_FILE" ]; then
   set -a
@@ -20,6 +22,12 @@ fi
 
 POSTGRES_USER="${POSTGRES_USER:-whisky}"
 POSTGRES_DB="${POSTGRES_DB:-whiskyindex}"
+
+if [ -n "$REMOTE_URL" ]; then
+  DATABASE_URL="$REMOTE_URL"
+else
+  unset DATABASE_URL
+fi
 
 # stdin is SQL; extra args are forwarded to psql (-c, flags, ...).
 run_psql() {
@@ -33,9 +41,9 @@ run_psql() {
 }
 
 if [ -n "${DATABASE_URL:-}" ]; then
-  echo "Seeding via DATABASE_URL from .env..."
+  echo "Seeding remote database via SEED_DATABASE_URL..."
 else
-  echo "Waiting for whiskyindex_db..."
+  echo "Seeding local Docker Postgres (whiskyindex_db)..."
   docker compose -f "$COMPOSE_FILE" exec -T db \
     pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null
 fi
