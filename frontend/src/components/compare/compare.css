@@ -1105,13 +1105,13 @@
     flex-wrap: wrap;
   }
 
-  /* A full selection used to wrap into a pile of overlapping labels. */
-  .growth-chart-legend {
-    max-height: 5.25rem;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* No cap: the legend wraps and the card grows, same as every width above
+     768px. Capping it here made an 18-stock selection scroll inside a 5rem
+     box while the card sat there with room to spare — and the page scrolls
+     on a phone anyway. The overlap this once guarded against came from the
+     picker's `height: 0` stretch leaking onto mobile (94358cd); that is
+     fixed at the grid, and `.growth-chart-frame` is `contain: size`, so a
+     taller legend cannot feed back into the chart. */
 
   /* Six chips: three-up, two even rows instead of a ragged wrap. */
   .compare-presets {
