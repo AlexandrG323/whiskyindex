@@ -27,7 +27,7 @@ export function StockAddedToast({ notice, onDismiss }: StockAddedToastProps) {
   return (
     <div className="stock-added-toast" role="status" aria-live="polite">
       <div className="stock-added-toast-logo">
-        <StockLogo symbol={notice.symbol} src={notice.imageUrl} size={72} />
+        <StockLogo symbol={notice.symbol} src={notice.imageUrl} size={40} />
       </div>
       <div className="stock-added-toast-copy">
         <p className="stock-added-toast-title">Добавлена акция: {notice.name}</p>

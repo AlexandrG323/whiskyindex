@@ -1522,23 +1522,23 @@
   bottom: max(var(--page-pad), env(safe-area-inset-bottom, 0px));
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  max-width: 26rem;
+  gap: 0.65rem;
+  max-width: 20rem;
   margin-inline: auto;
-  padding: 0.875rem 0.75rem 0.875rem 0.875rem;
+  padding: 0.6rem 0.5rem 0.6rem 0.65rem;
   border: 1px solid #2a2d33;
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(18, 19, 24, 0.96);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   animation: stock-added-in 0.22s ease-out;
 }
 
 .stock-added-toast-logo {
-  width: 4.5rem;
-  height: 4.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
   flex-shrink: 0;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
   background: #fff;
 }
@@ -1547,12 +1547,12 @@
 .stock-added-toast-logo .stock-logo-fallback {
   width: 100%;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 8px;
   object-fit: contain;
 }
 
 .stock-added-toast-logo .stock-logo-fallback {
-  font-size: 1.25rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #333;
   background: #fff;
@@ -1565,31 +1565,31 @@
 
 .stock-added-toast-title {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .stock-added-toast-meta {
-  margin: 0.3rem 0 0;
-  font-size: 0.8125rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.6875rem;
   color: var(--muted);
   line-height: 1.35;
 }
 
 .stock-added-toast-close {
   flex-shrink: 0;
-  width: var(--tap);
-  height: var(--tap);
-  margin: -0.35rem -0.2rem -0.35rem 0;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.15rem -0.1rem -0.15rem 0;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -1621,18 +1621,19 @@
 
 @media (max-width: 560px) {
   .stock-added-toast {
-    gap: 0.7rem;
-    padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+    gap: 0.6rem;
+    max-width: none;
+    padding: 0.7rem 0.45rem 0.7rem 0.7rem;
   }
 
   .stock-added-toast-logo {
-    width: 3.5rem;
-    height: 3.5rem;
-    border-radius: 12px;
+    width: 2.75rem;
+    height: 2.75rem;
   }
 
-  .stock-added-toast-title {
-    font-size: 0.875rem;
+  .stock-added-toast-close {
+    width: var(--tap);
+    height: var(--tap);
   }
 }
 
