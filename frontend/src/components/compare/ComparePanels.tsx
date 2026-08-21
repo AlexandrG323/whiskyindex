@@ -288,7 +288,8 @@ export function EquivalentsPanel({
         </>
       )}
       <p className="muted equivalents-footnote">
-        Если бы купили {stock.companyName} в {stock.priceFromYear}
+        Если бы купили {stock.companyName} в {stock.priceFromYear} за{' '}
+        {formatMoney(cartPriceFrom, currency)}
       </p>
     </aside>
   )
