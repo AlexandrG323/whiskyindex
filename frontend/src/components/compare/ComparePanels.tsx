@@ -5,6 +5,7 @@ import {
   formatWhiskyIndex,
   pickTopGrowthStock,
   stockInvestmentRange,
+  stockProfit,
 } from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
 import { StockCard } from '../comparison/StockCard'
@@ -97,6 +98,7 @@ export function RankingRow({
               type="button"
               key={stock.id}
               className="rank-card"
+              aria-label={`${stock.companyName}: ${formatGrowth(stock.growthPercent)}. Показать цены`}
               {...revealHandlers(stock.id)}
             >
               <span className="rank-card-top">
@@ -129,6 +131,7 @@ export function RankingRow({
         <button
           type="button"
           className="rank-card rank-card--basket"
+          aria-label={`Корзина скуфа: ${formatGrowth(cartGrowthPercent)}. Показать цены`}
           {...revealHandlers(CART_REVEAL_ID)}
         >
           <span className="rank-card-top">
@@ -165,7 +168,10 @@ interface EquivalentsPanelProps {
     name: string
     price: number | null
   }[]
-  cartPrice: number
+  /** Cart price at `from` — the sum that was notionally invested. */
+  cartPriceFrom: number
+  /** Cart price at `to` — what one basket costs in the "Корзина скуфа" row. */
+  cartPriceTo: number
   currency: 'RUB' | 'USD'
 }
 
@@ -190,7 +196,8 @@ export function EquivalentsPanel({
   selectedId,
   onSelect,
   products,
-  cartPrice,
+  cartPriceFrom,
+  cartPriceTo,
   currency,
 }: EquivalentsPanelProps) {
   const stock = stocks.find((item) => item.id === selectedId) ?? stocks[0]
@@ -205,11 +212,15 @@ export function EquivalentsPanel({
     )
   }
 
-  const investment = stockInvestmentRange(stock)
-  const profit = investment.to - investment.from
+  const profit = stockProfit(stock, cartPriceFrom)
   const absProfit = Math.abs(profit)
   const lost = profit < 0
 
+  // Every row divides the same display-currency profit by a display-currency
+  // price. `whiskyShare` is deliberately RUB-anchored, so mixing it in here
+  // made one row disagree with its neighbours by the whole rouble
+  // devaluation whenever the UI was in dollars — it belongs to the ranking
+  // card, not to this list.
   const affordable = products
     .filter((p) => p.price !== null && p.price > 0 && !EQUIVALENT_EXCLUDED.test(p.name))
     .map((p) => ({
@@ -219,17 +230,16 @@ export function EquivalentsPanel({
     }))
     .filter((p) => p.count > 0)
 
-  const whiskyCount = Math.floor(Math.abs(stock.whiskyShare))
-  const whiskyItems = affordable
-    .filter((p) => EQUIVALENT_WHISKY.test(p.name))
-    .map((p) => ({ ...p, count: whiskyCount }))
-    .filter((p) => p.count > 0)
-  const otherItems = affordable.filter((p) => !EQUIVALENT_WHISKY.test(p.name))
-  const productItems: EquivalentItem[] = [...whiskyItems, ...otherItems].slice(0, EQUIVALENT_LIMIT)
+  // Whisky leads the list — this is the whisky index. Matching on the name is
+  // fine now the count is the same formula as every other row.
+  const productItems: EquivalentItem[] = [
+    ...affordable.filter((p) => EQUIVALENT_WHISKY.test(p.name)),
+    ...affordable.filter((p) => !EQUIVALENT_WHISKY.test(p.name)),
+  ].slice(0, EQUIVALENT_LIMIT)
 
   const items: EquivalentItem[] = []
-  if (cartPrice > 0) {
-    const cartCount = Math.floor(absProfit / cartPrice)
+  if (cartPriceTo > 0) {
+    const cartCount = Math.floor(absProfit / cartPriceTo)
     if (cartCount > 0) {
       items.push({
         id: 'cart',
@@ -253,16 +263,14 @@ export function EquivalentsPanel({
     <aside className="compare-panel" aria-label={title}>
       <div className="compare-panel-header">
         <h3>{title}</h3>
-        {stocks.length > 0 && (
-          <Select
-            className="equivalents-select"
-            align="end"
-            ariaLabel="Акция для эквивалентов"
-            value={stock.id}
-            options={stocks.map((item) => ({ value: item.id, label: item.companyName }))}
-            onChange={onSelect}
-          />
-        )}
+        <Select
+          className="equivalents-select"
+          align="end"
+          ariaLabel="Акция для эквивалентов"
+          value={stock.id}
+          options={stocks.map((item) => ({ value: item.id, label: item.companyName }))}
+          onChange={onSelect}
+        />
       </div>
       {empty ? (
         <p className="muted">{empty}</p>
@@ -280,7 +288,7 @@ export function EquivalentsPanel({
         </>
       )}
       <p className="muted equivalents-footnote">
-        Если бы вложили стоимость корзины в {stock.companyName} в {stock.priceFromYear}
+        Если бы купили {stock.companyName} в {stock.priceFromYear}
       </p>
     </aside>
   )
