@@ -635,6 +635,7 @@ section:first-child > h2:first-child {
 .sidebar-nav a {
   display: flex;
   align-items: center;
+  gap: 0.625rem;
   min-height: var(--tap);
   padding: 0.625rem 0.875rem;
   color: var(--muted);
@@ -656,6 +657,18 @@ section:first-child > h2:first-child {
   background: var(--card);
   color: var(--accent);
   border: 1px solid var(--border);
+}
+
+/* The glyph is decorative: it sits at the label's colour but a step quieter,
+   so the row still reads as one word first and a picture second. */
+.sidebar-nav a svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.sidebar-nav a:hover svg,
+.sidebar-nav a.active svg {
+  opacity: 1;
 }
 
 .currency-switcher {

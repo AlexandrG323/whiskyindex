@@ -1,11 +1,21 @@
+import { useState } from 'react'
 import { BasketCard } from '../comparison/BasketCard'
-import { pickTopGrowthStock, stockInvestmentRange } from '../comparison/comparisonUtils'
+import {
+  formatMoney,
+  formatWhiskyIndex,
+  pickTopGrowthStock,
+  stockInvestmentRange,
+  stockProfit,
+} from '../comparison/comparisonUtils'
 import type { CompareStock } from '../comparison/HeroComparison'
 import { StockCard } from '../comparison/StockCard'
 import { StockLogo } from '../comparison/StockLogo'
+import { Select } from '../ui/Select'
 import { HorizontalScroller } from './HorizontalScroller'
 
 export { pickTopGrowthStock }
+
+const CART_REVEAL_ID = 'cart'
 
 function formatGrowth(value: number) {
   const rounded = Math.round(value)
@@ -13,14 +23,11 @@ function formatGrowth(value: number) {
   return `${sign}${rounded.toLocaleString('ru-RU')}%`
 }
 
-function formatMoney(amount: number, currency: 'RUB' | 'USD') {
-  const digits = Number.isInteger(amount) ? 0 : 2
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(amount)
+function formatSignedMoney(amount: number, currency: 'RUB' | 'USD') {
+  const formatted = formatMoney(Math.abs(amount), currency)
+  if (amount > 0) return `+${formatted}`
+  if (amount < 0) return `−${formatted}`
+  return formatted
 }
 
 interface AdvantageCardProps {
@@ -52,10 +59,28 @@ export function AdvantageCard({ stock, cartGrowthPercent, currency }: AdvantageC
 interface RankingRowProps {
   stocks: CompareStock[]
   cartGrowthPercent: number
+  currency: 'RUB' | 'USD'
+  cartFrom: number
+  cartTo: number
 }
 
-export function RankingRow({ stocks, cartGrowthPercent }: RankingRowProps) {
+export function RankingRow({
+  stocks,
+  cartGrowthPercent,
+  currency,
+  cartFrom,
+  cartTo,
+}: RankingRowProps) {
   const ranked = [...stocks].sort((a, b) => b.growthPercent - a.growthPercent)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
+  const revealedId = pinnedId ?? hoveredId
+
+  const revealHandlers = (id: string) => ({
+    onPointerEnter: () => setHoveredId(id),
+    onPointerLeave: () => setHoveredId((current) => (current === id ? null : current)),
+    onClick: () => setPinnedId((current) => (current === id ? null : id)),
+  })
 
   return (
     <section className="ranking-section" aria-label="Рейтинг">
@@ -63,46 +88,89 @@ export function RankingRow({ stocks, cartGrowthPercent }: RankingRowProps) {
       <HorizontalScroller trackClassName="ranking-row" label="рейтинг">
         {ranked.map((stock, index) => {
           const vsCart = stock.growthPercent - cartGrowthPercent
+          const revealed = revealedId === stock.id
+          const whiskyLabel = revealed ? formatWhiskyIndex(stock.whiskyShare) : null
+          let whiskyTone = ''
+          if (whiskyLabel && stock.whiskyShare < 0) whiskyTone = ' growth-negative'
+          else if (whiskyLabel && stock.whiskyShare > 0) whiskyTone = ' growth'
           return (
-            <article key={stock.id} className="rank-card">
-              <div className="rank-card-top">
+            <button
+              type="button"
+              key={stock.id}
+              className="rank-card"
+              aria-label={`${stock.companyName}: ${formatGrowth(stock.growthPercent)}. Показать цены`}
+              {...revealHandlers(stock.id)}
+            >
+              <span className="rank-card-top">
                 <span className="rank-index">{index + 1}</span>
                 <StockLogo symbol={stock.symbol} src={stock.imageUrl} size={28} />
-              </div>
-              <h4>{stock.companyName}</h4>
-              <p
-                className={`rank-growth ${stock.growthPercent >= 0 ? 'growth' : 'growth-negative'}`}
-              >
-                {formatGrowth(stock.growthPercent)}
-              </p>
-              <p className="rank-vs">{formatGrowth(vsCart)} к корзине</p>
-            </article>
+              </span>
+              <span className="rank-card-title">{stock.companyName}</span>
+              {revealed ? (
+                <span className="rank-prices">
+                  {formatMoney(stock.priceFrom, currency)}
+                  <span aria-hidden="true"> → </span>
+                  {formatMoney(stock.priceTo, currency)}
+                </span>
+              ) : (
+                <span
+                  className={`rank-growth ${
+                    stock.growthPercent >= 0 ? 'growth' : 'growth-negative'
+                  }`}
+                >
+                  {formatGrowth(stock.growthPercent)}
+                </span>
+              )}
+              <span className={`rank-vs${whiskyTone}`}>
+                {whiskyLabel ?? `${formatGrowth(vsCart)} к корзине`}
+              </span>
+            </button>
           )
         })}
 
-        <article className="rank-card rank-card--basket">
-          <div className="rank-card-top">
+        <button
+          type="button"
+          className="rank-card rank-card--basket"
+          aria-label={`Корзина скуфа: ${formatGrowth(cartGrowthPercent)}. Показать цены`}
+          {...revealHandlers(CART_REVEAL_ID)}
+        >
+          <span className="rank-card-top">
             <span className="rank-index">—</span>
             <img src="/icons/cart.png" alt="" width={28} height={28} />
-          </div>
-          <h4>Корзина скуфа</h4>
-          <p className={`rank-growth ${cartGrowthPercent >= 0 ? 'growth' : 'growth-negative'}`}>
-            {formatGrowth(cartGrowthPercent)}
-          </p>
-          <p className="rank-vs">базовый уровень</p>
-        </article>
+          </span>
+          <span className="rank-card-title">Корзина скуфа</span>
+          {revealedId === CART_REVEAL_ID ? (
+            <span className="rank-prices">
+              {formatMoney(cartFrom, currency)}
+              <span aria-hidden="true"> → </span>
+              {formatMoney(cartTo, currency)}
+            </span>
+          ) : (
+            <span
+              className={`rank-growth ${cartGrowthPercent >= 0 ? 'growth' : 'growth-negative'}`}
+            >
+              {formatGrowth(cartGrowthPercent)}
+            </span>
+          )}
+          <span className="rank-vs">базовый уровень</span>
+        </button>
       </HorizontalScroller>
     </section>
   )
 }
 
 interface EquivalentsPanelProps {
-  stock: CompareStock
+  stocks: CompareStock[]
+  selectedId: string | null
+  onSelect: (id: string) => void
   products: {
     id: string
     name: string
     price: number | null
   }[]
+  /** Cart price at `to` — what one basket costs in the "Корзина скуфа" row. */
+  cartPriceTo: number
+  currency: 'RUB' | 'USD'
 }
 
 /**
@@ -110,41 +178,115 @@ interface EquivalentsPanelProps {
  * equivalent it says nothing and crowds out things worth picturing.
  */
 const EQUIVALENT_EXCLUDED = /уголь/i
+const EQUIVALENT_WHISKY = /виски/i
 
 /** The column is as tall as the chart beside it, so it fits far more than 5. */
 const EQUIVALENT_LIMIT = 12
 
-export function EquivalentsPanel({ stock, products }: EquivalentsPanelProps) {
-  const investment = stockInvestmentRange(stock)
-  const items = products
+type EquivalentItem = {
+  id: string
+  name: string
+  count: number
+}
+
+export function EquivalentsPanel({
+  stocks,
+  selectedId,
+  onSelect,
+  products,
+  cartPriceTo,
+  currency,
+}: EquivalentsPanelProps) {
+  const stock = stocks.find((item) => item.id === selectedId) ?? stocks[0]
+  if (!stock) {
+    return (
+      <aside className="compare-panel">
+        <div className="compare-panel-header">
+          <h3>На что хватило бы сегодня?</h3>
+        </div>
+        <p className="muted">Выберите акцию, чтобы посчитать эквиваленты.</p>
+      </aside>
+    )
+  }
+
+  const profit = stockProfit(stock)
+  const absProfit = Math.abs(profit)
+  const lost = profit < 0
+
+  // Every row divides the same display-currency profit by a display-currency
+  // price. `whiskyShare` is deliberately RUB-anchored, so mixing it in here
+  // made one row disagree with its neighbours by the whole rouble
+  // devaluation whenever the UI was in dollars — it belongs to the ranking
+  // card, not to this list.
+  const affordable = products
     .filter((p) => p.price !== null && p.price > 0 && !EQUIVALENT_EXCLUDED.test(p.name))
     .map((p) => ({
       id: p.id,
       name: p.name,
-      count: Math.floor(investment.to / (p.price as number)),
+      count: Math.floor(absProfit / (p.price as number)),
     }))
     .filter((p) => p.count > 0)
-    .slice(0, EQUIVALENT_LIMIT)
+
+  // Whisky leads the list — this is the whisky index. Matching on the name is
+  // fine now the count is the same formula as every other row.
+  const productItems: EquivalentItem[] = [
+    ...affordable.filter((p) => EQUIVALENT_WHISKY.test(p.name)),
+    ...affordable.filter((p) => !EQUIVALENT_WHISKY.test(p.name)),
+  ].slice(0, EQUIVALENT_LIMIT)
+
+  const items: EquivalentItem[] = []
+  if (cartPriceTo > 0) {
+    const cartCount = Math.floor(absProfit / cartPriceTo)
+    if (cartCount > 0) {
+      items.push({
+        id: 'cart',
+        name: 'Корзина скуфа',
+        count: cartCount,
+      })
+    }
+  }
+  items.push(...productItems)
+
+  const title = lost ? 'Что сгорело за период?' : 'На что хватило бы сегодня?'
+  const lead = lost
+    ? `${formatSignedMoney(profit, currency)} убытка — это:`
+    : `${formatSignedMoney(profit, currency)} прибыли — на них можно купить:`
+  const empty =
+    profit === 0 || items.length === 0
+      ? `Ни туда, ни сюда: ${stock.companyName} осталась при своих`
+      : null
 
   return (
-    <aside className="compare-panel" aria-label="На что хватило бы">
+    <aside className="compare-panel" aria-label={title}>
       <div className="compare-panel-header">
-        <h3>На что хватило бы сегодня?</h3>
+        <h3>{title}</h3>
+        <Select
+          className="equivalents-select"
+          align="end"
+          ariaLabel="Акция для эквивалентов"
+          value={stock.id}
+          options={stocks.map((item) => ({ value: item.id, label: item.companyName }))}
+          onChange={onSelect}
+        />
       </div>
-      {items.length === 0 ? (
-        <p className="muted">Нет данных по товарам корзины.</p>
+      {empty ? (
+        <p className="muted">{empty}</p>
       ) : (
-        <ul className="equivalents-list">
-          {items.map((item) => (
-            <li key={item.id}>
-              <strong>{item.count.toLocaleString('ru-RU')}</strong>
-              <span>{item.name}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className={`equivalents-lead ${lost ? 'growth-negative' : 'growth'}`}>{lead}</p>
+          <ul className="equivalents-list">
+            {items.map((item) => (
+              <li key={item.id} className={item.id === 'cart' ? 'is-cart' : undefined}>
+                <strong>{item.count.toLocaleString('ru-RU')}</strong>
+                <span>{item.name}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-      <p className="muted" style={{ margin: 'auto 0 0', fontSize: '0.75rem' }}>
-        Если бы вложили стоимость корзины в {stock.companyName}
+      <p className="muted equivalents-footnote">
+        Если бы купили {stock.companyName} в {stock.priceFromYear} на{' '}
+        {formatMoney(stock.cartAtFrom, currency)}
       </p>
     </aside>
   )

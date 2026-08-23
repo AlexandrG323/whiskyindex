@@ -13,6 +13,9 @@ import { StocksService } from './stocks.service'
 const MAX_QUERY_LENGTH = 200
 const MAX_CANDIDATES = 5
 
+/** Concurrent symbol probes. Each one is a full MIN_YEAR..MAX_YEAR fetch. */
+const PROBE_CONCURRENCY = 2
+
 const SYSTEM_PROMPT = `You map a free-form description of a publicly traded company or stock to ticker candidates.
 
 Return JSON only of the form:
@@ -23,10 +26,100 @@ Rules:
 - confidence is a number from 0 to 1.
 - For Russian stocks use exchange MOEX (or TQBR) and the ISS ticker WITHOUT a Yahoo suffix (SBER, GAZP, AVAZ — never SBER.ME).
 - For every other venue use Yahoo Finance ticker conventions: put the Yahoo suffix IN the symbol (VOD.L, 7203.T, 0700.HK, BMW.DE, RR.L). Exchange is the human venue name (LSE, NASDAQ, NYSE, HKEX, TSE, FRA, and so on).
-- MOEX and TQBR are the only exchanges fetched from MOEX ISS; anything else is fetched from Yahoo using the symbol as-is.
+- MOEX and TQBR are fetched from MOEX ISS. Everything else is fetched from Yahoo using the symbol as-is. If Yahoo has no chart for a venue, we cannot import it.
+- Do NOT return tickers from boards Yahoo does not cover (UZSE/Tashkent, many Caucasus, Central Asian, and African local boards, and similar). Empty candidates is better than local codes we cannot fetch. An ADR, GDR, or other Yahoo-listed cross-listing is fine when one exists.
 - Prefer ordinary shares that are or were publicly listed. Avoid ETFs unless the query asks for a fund.
-- If the query is qualitative ("fastest growing British stock"), pick plausible well-known listings and say so in reason.
+- If the query is qualitative ("fastest growing British stock"), pick plausible well-known listings that Yahoo or MOEX actually has and say so in reason.
 - Never invent private companies that are not listed.`
+
+/**
+ * Yahoo chart suffix when the model gives a bare ticker + venue name.
+ *
+ * Only unambiguous codes belong here. TSE (Tokyo/Toronto), BSE (Bombay/
+ * Budapest/Bahrain), CSE (Copenhagen/Canadian/Colombo) and PSE (Prague/
+ * Philippine) each name two real venues, and guessing wrong imports a
+ * different company under the ticker the user asked for — the unambiguous
+ * aliases below (TYO/JPX, TSX/TOR, BOM, CPH, PRA) cover the same venues.
+ */
+const YAHOO_SUFFIX_BY_EXCHANGE: Record<string, string> = {
+  LSE: '.L',
+  LON: '.L',
+  LONDON: '.L',
+  TYO: '.T',
+  TOKYO: '.T',
+  JPX: '.T',
+  HKEX: '.HK',
+  HKG: '.HK',
+  HK: '.HK',
+  FRA: '.DE',
+  ETR: '.DE',
+  XETRA: '.DE',
+  GER: '.DE',
+  FSE: '.F',
+  PAR: '.PA',
+  EPA: '.PA',
+  AMS: '.AS',
+  AEX: '.AS',
+  BRU: '.BR',
+  EBR: '.BR',
+  LIS: '.LS',
+  ELI: '.LS',
+  MIL: '.MI',
+  BIT: '.MI',
+  MAD: '.MC',
+  MCE: '.MC',
+  BME: '.MC',
+  SWX: '.SW',
+  SIX: '.SW',
+  VTX: '.SW',
+  STO: '.ST',
+  CPH: '.CO',
+  HEL: '.HE',
+  OSL: '.OL',
+  VIE: '.VI',
+  WBO: '.VI',
+  WAR: '.WA',
+  WSE: '.WA',
+  PRA: '.PR',
+  IST: '.IS',
+  BIST: '.IS',
+  TSX: '.TO',
+  TOR: '.TO',
+  ASX: '.AX',
+  AX: '.AX',
+  KRX: '.KS',
+  KOSPI: '.KS',
+  SEOUL: '.KS',
+  KOSDAQ: '.KQ',
+  SSE: '.SS',
+  SHA: '.SS',
+  SHANGHAI: '.SS',
+  SZSE: '.SZ',
+  SHE: '.SZ',
+  SHENZHEN: '.SZ',
+  BOM: '.BO',
+  NSE: '.NS',
+  NSEI: '.NS',
+  TPE: '.TW',
+  TWSE: '.TW',
+  TAIWAN: '.TW',
+  JSE: '.JO',
+  JOH: '.JO',
+  SAO: '.SA',
+  B3: '.SA',
+  BOVESPA: '.SA',
+  MEX: '.MX',
+  BMV: '.MX',
+  TASE: '.TA',
+  TLV: '.TA',
+}
+
+function yahooRetrySymbol(symbol: string, exchange: string): string | null {
+  if (symbol.includes('.')) return null
+  if (exchange === 'MOEX' || exchange === 'TQBR') return null
+  const suffix = YAHOO_SUFFIX_BY_EXCHANGE[exchange.replace(/[^A-Z0-9]/g, '')]
+  return suffix ? `${symbol}${suffix}` : null
+}
 
 @Injectable()
 export class StockQueryService {
@@ -55,52 +148,99 @@ export class StockQueryService {
     )
 
     const candidates = parseCandidates(await this.openRouter.chatJson(SYSTEM_PROMPT, query))
-    const tried: StockQueryTriedDto[] = []
 
-    for (const candidate of candidates) {
+    // Every candidate is probed (the dialog shows coverage for all of them),
+    // but a bare Promise.all fires up to MAX_CANDIDATES × 2 full-history
+    // requests at once — exactly the burst yahoo.client.ts warns 429s on.
+    const probes = await mapWithConcurrency(candidates, PROBE_CONCURRENCY, async (candidate) => {
       if (exclude.has(listingKey(candidate.symbol, candidate.exchange))) {
-        continue
+        return { candidate, excluded: true as const }
       }
-
       const source = sourceFromExchange(candidate.exchange)
       const probe = await this.stockImport.probeSymbol(candidate.symbol, source)
-      tried.push({
-        symbol: candidate.symbol,
-        exchange: candidate.exchange,
-        available: probe.available,
-      })
-
       if (!probe.available) {
-        continue
+        const retrySymbol = yahooRetrySymbol(candidate.symbol, candidate.exchange)
+        if (retrySymbol) {
+          const retry = await this.stockImport.probeSymbol(retrySymbol, 'yahoo')
+          if (retry.available) {
+            return {
+              candidate: { ...candidate, symbol: retrySymbol },
+              excluded: false as const,
+              probe: retry,
+            }
+          }
+        }
       }
+      return { candidate, excluded: false as const, probe }
+    })
+
+    const listed = probes.flatMap((item) => (item.excluded ? [] : [item.candidate]))
+    const excluded = probes.length - listed.length
+
+    const tried: StockQueryTriedDto[] = probes.flatMap((item) =>
+      item.excluded
+        ? []
+        : [
+            {
+              symbol: item.candidate.symbol,
+              exchange: item.candidate.exchange,
+              available: item.probe.available,
+              firstYear: item.probe.firstYear,
+              lastYear: item.probe.lastYear,
+            },
+          ],
+    )
+
+    for (const item of probes) {
+      if (item.excluded || !item.probe.available) continue
 
       const resolved = await this.stocksService.resolve({
-        symbol: candidate.symbol,
-        exchange: candidate.exchange,
+        symbol: item.candidate.symbol,
+        exchange: item.candidate.exchange,
       })
 
       if (resolved.importStatus === 'failed') {
         this.logger.warn(
-          `Resolve failed after successful probe for ${candidate.symbol} ${candidate.exchange}`,
+          `Resolve failed after successful probe for ${item.candidate.symbol} ${item.candidate.exchange}`,
         )
         continue
       }
 
-      const companyName = probe.companyName || candidate.companyName
+      const companyName = item.probe.companyName || item.candidate.companyName
       const payload: ResolveQueryStockDto = {
         id: resolved.id,
         symbol: resolved.symbol,
-        exchange: candidate.exchange,
+        exchange: item.candidate.exchange,
         importStatus: resolved.importStatus,
         imageUrl: resolved.imageUrl,
         ...(companyName ? { companyName } : {}),
       }
 
-      return { resolved: payload, candidates, tried }
+      return { resolved: payload, candidates: listed, tried, excluded }
     }
 
-    return { resolved: null, candidates, tried }
+    return { resolved: null, candidates: listed, tried, excluded }
   }
+}
+
+/** Promise.all with a ceiling on how many run at once. Order is preserved. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await fn(items[index])
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
 }
 
 function sourceFromExchange(exchange: string): 'moex' | 'yahoo' {

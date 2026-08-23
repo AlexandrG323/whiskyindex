@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { Currency } from '../lib/currency'
+import { CartIcon, CompareIcon, HomeIcon, InfoIcon, StocksIcon } from './ui/icons'
 
 const LINKS = [
-  { to: '/', label: 'Главная', end: true },
-  { to: '/cart', label: 'Корзина скуфа' },
-  { to: '/stocks', label: 'Акции' },
-  { to: '/compare', label: 'Сравнение' },
-  { to: '/about', label: 'О проекте' },
+  { to: '/', label: 'Главная', end: true, Icon: HomeIcon },
+  { to: '/cart', label: 'Корзина скуфа', Icon: CartIcon },
+  { to: '/stocks', label: 'Акции', Icon: StocksIcon },
+  { to: '/compare', label: 'Сравнение', Icon: CompareIcon },
+  { to: '/about', label: 'О проекте', Icon: InfoIcon },
 ]
 
 const CURRENCIES: { value: Currency; label: string }[] = [
@@ -53,6 +54,7 @@ export function Sidebar({ open, onClose, currency, onCurrencyChange }: SidebarPr
               end={link.end}
               className={({ isActive }) => (isActive ? 'active' : '')}
             >
+              <link.Icon />
               {link.label}
             </NavLink>
           ))}

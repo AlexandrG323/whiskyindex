@@ -107,6 +107,26 @@
   color: var(--muted);
 }
 
+.about-author {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.about-author a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.about-author a:hover {
+  color: var(--text);
+}
+
 .about-sources {
   display: flex;
   flex-direction: column;
@@ -192,5 +212,10 @@
 @media (hover: none) {
   .about-btn {
     min-height: var(--tap);
+  }
+
+  .about-author a {
+    width: var(--tap);
+    height: var(--tap);
   }
 }

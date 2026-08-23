@@ -319,20 +319,28 @@ export class StockImportService {
   async probeSymbol(
     symbol: string,
     source: 'moex' | 'yahoo',
-  ): Promise<{ available: boolean; companyName: string | null }> {
+  ): Promise<{
+    available: boolean
+    companyName: string | null
+    firstYear: number | null
+    lastYear: number | null
+  }> {
     try {
       const fetched =
         source === 'moex'
           ? await this.moex.fetchMonthlyCandles(symbol, MIN_YEAR, MAX_YEAR)
           : await this.yahoo.fetchMonthlyCandles(symbol, MIN_YEAR, MAX_YEAR)
+      const years = fetched.candles.map((candle) => new Date(candle.date).getUTCFullYear())
       return {
         available: fetched.candles.length > 0,
         companyName: fetched.companyName,
+        firstYear: years.length > 0 ? Math.min(...years) : null,
+        lastYear: years.length > 0 ? Math.max(...years) : null,
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       this.logger.warn(`Probe failed for ${symbol} (${source}): ${errorMessage}`)
-      return { available: false, companyName: null }
+      return { available: false, companyName: null, firstYear: null, lastYear: null }
     }
   }
 

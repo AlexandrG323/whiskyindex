@@ -2,8 +2,8 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const DEFAULT_MODEL = 'openai/gpt-4o-mini'
-const REQUEST_TIMEOUT_MS = 20_000
+const DEFAULT_MODEL = 'openai/gpt-5.6-luna'
+const REQUEST_TIMEOUT_MS = 45_000
 
 type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -13,6 +13,7 @@ type OpenRouterMessage = {
 type OpenRouterChatResponse = {
   choices?: Array<{
     message?: OpenRouterMessage
+    finish_reason?: string | null
   }>
   error?: {
     message?: string
@@ -52,8 +53,10 @@ export class OpenRouterClient {
         },
         body: JSON.stringify({
           model,
-          temperature: 0.2,
-          max_tokens: 400,
+          // No `temperature`: the reasoning models this runs on do not accept
+          // it, and OpenRouter silently drops it rather than honouring it.
+          max_tokens: 2000,
+          reasoning: { effort: 'low' },
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: system },
@@ -70,7 +73,8 @@ export class OpenRouterClient {
 
     const raw = await res.text()
     if (!res.ok) {
-      this.logger.error(`OpenRouter HTTP ${res.status}`)
+      // The body is the only place a rejected model id or parameter shows up.
+      this.logger.error(`OpenRouter HTTP ${res.status} for model ${model}: ${raw.slice(0, 500)}`)
       throw new ServiceUnavailableException(
         'Не удалось обратиться к модели. Попробуйте ещё раз или укажите тикер.',
       )
@@ -85,11 +89,25 @@ export class OpenRouterClient {
       )
     }
 
-    const content = payload.choices?.[0]?.message?.content
+    const choice = payload.choices?.[0]
+    const content = choice?.message?.content
     if (!content) {
-      this.logger.error(`OpenRouter empty content: ${payload.error?.message ?? 'no choices'}`)
+      this.logger.error(
+        `OpenRouter empty content (finish_reason=${choice?.finish_reason ?? 'none'}): ${
+          payload.error?.message ?? 'no choices'
+        }`,
+      )
       throw new ServiceUnavailableException(
         'Модель вернула пустой ответ. Попробуйте ещё раз или укажите тикер.',
+      )
+    }
+
+    // Reasoning tokens count against max_tokens, so a truncated answer arrives
+    // as unparseable JSON. Say that, rather than blaming the model's format.
+    if (choice?.finish_reason === 'length') {
+      this.logger.error(`OpenRouter hit max_tokens for model ${model}; answer truncated`)
+      throw new ServiceUnavailableException(
+        'Модель не успела ответить целиком. Попробуйте ещё раз или укажите тикер.',
       )
     }
 

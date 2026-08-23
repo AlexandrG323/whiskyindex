@@ -14,7 +14,8 @@
     "format": "biome format --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run lint:fix && npm run typecheck",
-    "db:seed": "./db/seed.sh"
+    "db:seed": "./db/seed.sh",
+    "db:seed:prod": "./db/seed-prod.sh"
   },
   "lint-staged": {
     "*": "biome check --write --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true"
