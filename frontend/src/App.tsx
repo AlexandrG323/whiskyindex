@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react'
 import { useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { Select } from './components/ui/Select'
@@ -69,16 +70,24 @@ export default function App() {
   )
 
   return (
-    <Routes>
-      <Route
-        element={<AppLayout header={header} currency={currency} onCurrencyChange={setCurrency} />}
-      >
-        <Route path="/" element={<HomePage year={year} toYear={MAX_YEAR} currency={currency} />} />
-        <Route path="/cart" element={<CartPage year={year} currency={currency} />} />
-        <Route path="/stocks" element={<StocksPage year={year} currency={currency} />} />
-        <Route path="/compare" element={<ComparePage currency={currency} />} />
-        <Route path="/about" element={<AboutPage />} />
-      </Route>
-    </Routes>
+    <>
+      <Routes>
+        <Route
+          element={<AppLayout header={header} currency={currency} onCurrencyChange={setCurrency} />}
+        >
+          <Route
+            path="/"
+            element={<HomePage year={year} toYear={MAX_YEAR} currency={currency} />}
+          />
+          <Route path="/cart" element={<CartPage year={year} currency={currency} />} />
+          <Route path="/stocks" element={<StocksPage year={year} currency={currency} />} />
+          <Route path="/compare" element={<ComparePage currency={currency} />} />
+          <Route path="/about" element={<AboutPage />} />
+        </Route>
+      </Routes>
+
+      {/* Подключаем аналитику Vercel */}
+      <Analytics />
+    </>
   )
 }
