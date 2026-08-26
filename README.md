@@ -134,9 +134,25 @@ npm run lint        # Biome: ошибки и warnings блокируют
 npm run lint:fix   # автофиксы
 npm run typecheck   # tsc --noEmit в frontend и backend
 npm run check       # lint + typecheck (то же, что pre-push)
+npm test            # backend unit + e2e
 ```
 
 Обойти hooks можно только явно (`git commit --no-verify` / `HUSKY=0`) — так делать не стоит.
+
+## API-тесты
+
+Backend на Jest: unit рядом с кодом (`src/**/*.spec.ts`) и e2e против локального
+Docker Postgres (`backend/test/*.e2e-spec.ts`). Import в e2e заглушен — MOEX / Yahoo
+не вызываются.
+
+```bash
+docker compose up -d db   # и npm run db:seed, если том пустой
+cp backend/.env.example backend/.env   # если ещё нет
+npm test                  # из корня (или npm test в backend/)
+```
+
+Из `backend/`: `npm run test:unit` / `npm run test:e2e` по отдельности.
+E2e **не** в pre-push — нужна Postgres.
 
 ## Статус
 
