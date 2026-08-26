@@ -13,6 +13,18 @@ npm run start:dev
 
 API: `http://localhost:3000/api` · Swagger: `http://localhost:3000/api/docs`.
 
+## Тесты
+
+Нужен локальный Postgres (`docker compose up -d db` из корня; `npm run db:seed`,
+если том пустой) и `DATABASE_URL` в `backend/.env`. E2e поднимает Nest и ходит
+в HTTP; `StockImportService` заглушен — MOEX / Yahoo не вызываются.
+
+```bash
+npm test            # unit + e2e
+npm run test:unit   # src/**/*.spec.ts (без БД)
+npm run test:e2e    # backend/test/*.e2e-spec.ts
+```
+
 ## Эндпоинты (v1)
 
 | Метод | Путь | Описание |

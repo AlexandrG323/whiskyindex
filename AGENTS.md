@@ -25,6 +25,7 @@ npm run lint          # Biome; errors and warnings fail
 npm run lint:fix
 npm run typecheck     # tsc --noEmit in both workspaces
 npm run check         # lint:fix + typecheck (same as pre-push)
+npm test              # backend unit + e2e (e2e needs local Postgres)
 npm run db:seed       # re-apply schema + seed to local Docker Postgres
 npm run db:seed:prod  # same, against DATABASE_URL (production; confirmation)
 ```
