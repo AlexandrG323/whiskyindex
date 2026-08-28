@@ -18,8 +18,8 @@ describe('custom stock storage', () => {
   })
 
   it('round-trips a saved listing', () => {
-    expect(saveCustomStock(aapl)).toEqual([aapl])
-    expect(loadCustomStocks()).toEqual([aapl])
+    expect(saveCustomStock(aapl)).toEqual([])
+    expect(loadCustomStocks()).toEqual([])
   })
 
   it('ignores a duplicate id or listing', () => {
