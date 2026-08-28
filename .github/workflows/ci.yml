@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30 / undici 8 need worker_threads.markAsUncloneable (Node >= 22.10).
+          node-version: 24
           cache: npm
 
       - name: Start Postgres
