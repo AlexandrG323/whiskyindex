@@ -16,6 +16,17 @@ npm run dev
 Прод (Vercel): тот же относительный `/api`; rewrite на Fly задан в `vercel.json`.
 Root Directory проекта — `frontend`, output — `dist`. Подробности в корневом `README.md`.
 
+## Тесты
+
+Vitest + Testing Library (jsdom). Спеки рядом с кодом: `src/**/*.spec.ts`, `*.spec.tsx`.
+
+```bash
+npm test          # один прогон
+npm run test:watch
+```
+
+Живой API не дергаем — `fetch` стабится в тестах.
+
 ## Домашка
 
 См. [HOMEWORK.md](./HOMEWORK.md) — левая панель навигации + пустые страницы через React Router.

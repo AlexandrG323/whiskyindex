@@ -25,7 +25,7 @@ npm run lint          # Biome; errors and warnings fail
 npm run lint:fix
 npm run typecheck     # tsc --noEmit in both workspaces
 npm run check         # lint:fix + typecheck (same as pre-push)
-npm test              # backend unit + e2e (e2e needs local Postgres)
+npm test              # frontend Vitest + backend unit/e2e (e2e needs local Postgres)
 npm run db:seed       # re-apply schema + seed to local Docker Postgres
 npm run db:seed:prod  # same, against DATABASE_URL (production; confirmation)
 ```
@@ -43,6 +43,7 @@ Do not skip Husky (`--no-verify` / `HUSKY=0`).
 - Year range is `1998–2026`, default `2007` — keep `backend/src/common/years.ts` and the frontend `App.tsx` constants in sync. 1998 is the ruble redenomination; do not back-fill pre-listing prices.
 - Historical figures do not change in a session: prefer `getJson` / `postJson` in `frontend/src/lib/api.ts`. Use `fetchJson` only when the same URL’s status can change (resolve/poll).
 - Product copy and UI strings are Russian; code, comments, and commit messages are English.
+- Frontend tests: Vitest + Testing Library, colocated `*.spec.ts` / `*.spec.tsx`. Stub `fetch`; do not hit the live API.
 
 ## Do not
 
