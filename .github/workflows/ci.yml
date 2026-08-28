@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HUSKY: '0'
+      DATABASE_URL: postgresql://whisky:whisky@localhost:5432/whiskyindex
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # jsdom 30 / undici 8 need worker_threads.markAsUncloneable (Node >= 22.10).
+          node-version: 24
+          cache: npm
+
+      - name: Start Postgres
+        run: docker compose up -d db --wait
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

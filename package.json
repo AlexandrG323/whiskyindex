@@ -7,6 +7,9 @@
     "frontend",
     "backend"
   ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "scripts": {
     "prepare": "husky",
     "lint": "biome check --error-on-warnings .",
@@ -14,7 +17,7 @@
     "format": "biome format --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run lint:fix && npm run typecheck",
-    "test": "npm run test --workspace=whiskyindex-backend",
+    "test": "npm run test --workspaces --if-present",
     "db:seed": "./db/seed.sh",
     "db:seed:prod": "./db/seed-prod.sh"
   },

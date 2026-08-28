@@ -134,25 +134,40 @@ npm run lint        # Biome: ошибки и warnings блокируют
 npm run lint:fix   # автофиксы
 npm run typecheck   # tsc --noEmit в frontend и backend
 npm run check       # lint + typecheck (то же, что pre-push)
-npm test            # backend unit + e2e
+npm test            # frontend Vitest + backend unit/e2e
 ```
 
 Обойти hooks можно только явно (`git commit --no-verify` / `HUSKY=0`) — так делать не стоит.
 
-## API-тесты
+## Тесты
+
+Frontend на Vitest + Testing Library: unit/component рядом с кодом
+(`frontend/src/**/*.spec.ts`, `*.spec.tsx`), jsdom. Fetch стабится — живой API
+не вызывается.
 
 Backend на Jest: unit рядом с кодом (`src/**/*.spec.ts`) и e2e против локального
 Docker Postgres (`backend/test/*.e2e-spec.ts`). Import в e2e заглушен — MOEX / Yahoo
 не вызываются.
 
 ```bash
+# frontend — без серверов
+npm test --workspace=whiskyindex-frontend
+
+# backend e2e — нужен Postgres
 docker compose up -d db   # и npm run db:seed, если том пустой
 cp backend/.env.example backend/.env   # если ещё нет
-npm test                  # из корня (или npm test в backend/)
+
+npm test                  # из корня: оба workspace
 ```
 
+Из `frontend/`: `npm test` / `npm run test:watch`.
 Из `backend/`: `npm run test:unit` / `npm run test:e2e` по отдельности.
-E2e **не** в pre-push — нужна Postgres.
+Тесты **не** в pre-push (e2e нужна Postgres) — их гоняет GitHub Actions
+(`.github/workflows/ci.yml`) на каждый PR и на `main`: lint, typecheck, frontend
+Vitest, backend unit + e2e.
+
+Чтобы GitHub **не давал merge** при красном CI: Settings → Rules → Rulesets
+(или Branch protection) на `main`, required status check — job **`test`**.
 
 ## Статус
 
