@@ -30,6 +30,10 @@ npm run db:seed       # re-apply schema + seed to local Docker Postgres
 npm run db:seed:prod  # same, against DATABASE_URL (production; confirmation)
 ```
 
+CI (GitHub Actions `.github/workflows/ci.yml`) runs lint, typecheck, and `npm test`
+on every PR and on `main`. Postgres comes from `docker compose up -d db`. Require
+the job named `test` as a status check on `main` so a failing run blocks merge.
+
 Local run: Postgres via `docker compose up -d db`, then `npm run start:dev` in `backend/` and `npm run dev` in `frontend/`. Full stack: `docker compose up --build` (UI `:5173`, API `:3000`).
 
 Do not skip Husky (`--no-verify` / `HUSKY=0`).

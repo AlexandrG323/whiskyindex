@@ -162,7 +162,12 @@ npm test                  # из корня: оба workspace
 
 Из `frontend/`: `npm test` / `npm run test:watch`.
 Из `backend/`: `npm run test:unit` / `npm run test:e2e` по отдельности.
-Тесты **не** в pre-push (e2e нужна Postgres).
+Тесты **не** в pre-push (e2e нужна Postgres) — их гоняет GitHub Actions
+(`.github/workflows/ci.yml`) на каждый PR и на `main`: lint, typecheck, frontend
+Vitest, backend unit + e2e.
+
+Чтобы GitHub **не давал merge** при красном CI: Settings → Rules → Rulesets
+(или Branch protection) на `main`, required status check — job **`test`**.
 
 ## Статус
 
