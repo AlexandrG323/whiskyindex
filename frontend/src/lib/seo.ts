@@ -3,9 +3,6 @@ import catalog from './seoPages.json'
 export const SITE_HOST = 'whiskyindex.online'
 export const SITE_URL = `https://${SITE_HOST}`
 export const SITE_NAME = 'Whisky Index'
-/** One share image for every route — the home OG card. */
-export const OG_IMAGE = '/og/home.png'
-export const OG_IMAGE_ALT = catalog['/'].ogImageAlt
 
 export const SEO_PATHS = Object.keys(catalog) as Array<keyof typeof catalog>
 
@@ -58,8 +55,8 @@ function toSeoPage(path: keyof typeof catalog): SeoPage {
     title: entry.title,
     description: entry.description,
     ogSubtitle: entry.ogSubtitle,
-    ogImage: OG_IMAGE,
-    ogImageAlt: OG_IMAGE_ALT,
+    ogImage: `/og/${entry.slug}.png`,
+    ogImageAlt: entry.ogImageAlt,
   }
 }
 

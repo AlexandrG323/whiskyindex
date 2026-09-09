@@ -21,7 +21,7 @@ describe('normalizePath', () => {
 })
 
 describe('getSeoPage / resolveSeo', () => {
-  it('gives every route a distinct title, description, and canonical, and the same OG image', () => {
+  it('gives every route a distinct title, description, canonical, and og image', () => {
     const titles = new Set<string>()
     const descriptions = new Set<string>()
     const canonicals = new Set<string>()
@@ -32,8 +32,8 @@ describe('getSeoPage / resolveSeo', () => {
       expect(page.title.length).toBeGreaterThan(0)
       expect(page.description.length).toBeGreaterThan(0)
       expect(page.canonical).toBe(`${SITE_URL}${path === '/' ? '/' : path}`)
-      expect(page.ogImageUrl).toBe(`${SITE_URL}/og/home.png`)
-      expect(page.ogImage).toBe('/og/home.png')
+      expect(page.ogImageUrl).toBe(`${SITE_URL}/og/${page.slug}.png`)
+      expect(page.ogImage).toBe(`/og/${page.slug}.png`)
       titles.add(page.title)
       descriptions.add(page.description)
       canonicals.add(page.canonical)
@@ -43,7 +43,7 @@ describe('getSeoPage / resolveSeo', () => {
     expect(titles.size).toBe(SEO_PATHS.length)
     expect(descriptions.size).toBe(SEO_PATHS.length)
     expect(canonicals.size).toBe(SEO_PATHS.length)
-    expect(images.size).toBe(1)
+    expect(images.size).toBe(SEO_PATHS.length)
   })
 
   it('falls back to the home pair for unknown paths', () => {

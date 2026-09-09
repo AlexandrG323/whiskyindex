@@ -1,8 +1,33 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
+import { htmlForRoute } from './src/lib/applySeoHtml'
+import { SEO_PATHS } from './src/lib/seo'
+
+function seoHtmlPlugin(): Plugin {
+  return {
+    name: 'seo-html',
+    apply: 'build',
+    writeBundle({ dir }) {
+      if (!dir) return
+      const template = readFileSync(join(dir, 'index.html'), 'utf8')
+      for (const path of SEO_PATHS) {
+        const html = htmlForRoute(template, path)
+        if (path === '/') {
+          writeFileSync(join(dir, 'index.html'), html)
+          continue
+        }
+        const routeDir = join(dir, path.slice(1))
+        mkdirSync(routeDir, { recursive: true })
+        writeFileSync(join(routeDir, 'index.html'), html)
+      }
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), seoHtmlPlugin()],
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
