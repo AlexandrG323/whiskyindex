@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OG card</title>
+    <style>
+      :root {
+        --bg: #0b0b0d;
+        --card: #141417;
+        --border: #26262b;
+        --text: #f2f2f4;
+        --muted: #91919c;
+        --accent: #e9922e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: #000;
+      }
+
+      .og-card {
+        width: 1200px;
+        height: 630px;
+        padding: 64px 72px;
+        display: flex;
+        align-items: center;
+        gap: 56px;
+        overflow: hidden;
+        color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background:
+          radial-gradient(circle at 92% 8%, rgba(233, 146, 46, 0.22), transparent 42%),
+          linear-gradient(145deg, #1a1c22 0%, var(--bg) 55%);
+        border: 1px solid var(--border);
+      }
+
+      .og-logo {
+        width: 200px;
+        height: 200px;
+        flex-shrink: 0;
+        border-radius: 36px;
+        object-fit: cover;
+        background: #000;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      }
+
+      .og-copy {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+      }
+
+      .og-kicker {
+        margin: 0 0 16px;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .og-title {
+        margin: 0;
+        font-size: 72px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.05;
+      }
+
+      .og-subtitle {
+        margin: 20px 0 0;
+        max-width: 36em;
+        font-size: 28px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .og-url {
+        margin: auto 0 0;
+        padding-top: 28px;
+        font-size: 22px;
+        letter-spacing: 0.02em;
+        color: #6f6f78;
+      }
+    </style>
+  </head>
+  <body>
+    <article class="og-card">
+      <img class="og-logo" src="../brand-src/logo.png" alt="" width="200" height="200" />
+      <div class="og-copy">
+        <p class="og-kicker" id="kicker">Главная</p>
+        <h1 class="og-title">Whisky Index</h1>
+        <p class="og-subtitle" id="subtitle"></p>
+        <p class="og-url">whiskyindex.online</p>
+      </div>
+    </article>
+    <script>
+      const params = new URLSearchParams(location.search)
+      const kicker = params.get('kicker')
+      const subtitle = params.get('subtitle')
+      if (kicker) document.getElementById('kicker').textContent = kicker
+      if (subtitle) document.getElementById('subtitle').textContent = subtitle
+    </script>
+  </body>
+</html>

@@ -104,7 +104,7 @@ export function HomePage({ year, toYear = DEFAULT_TO_YEAR, currency }: HomePageP
   return (
     <div className={loading ? 'is-loading' : undefined}>
       <header className="page-intro">
-        <h2>Корзина скуфа против акций</h2>
+        <h1>Корзина скуфа против акций</h1>
         <p className="page-intro-lead">
           С {fromYear} по {toYear} год: сколько стоила корзина повседневных покупок и что за это
           время сделали акции.

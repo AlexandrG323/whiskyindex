@@ -24,6 +24,7 @@ describe('Sidebar', () => {
   it('renders the section links with the expected paths', () => {
     renderSidebar()
 
+    expect(screen.getByRole('img', { name: 'Whisky Index' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /главная/i })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: /корзина скуфа/i })).toHaveAttribute('href', '/cart')
     expect(screen.getByRole('link', { name: /акции/i })).toHaveAttribute('href', '/stocks')

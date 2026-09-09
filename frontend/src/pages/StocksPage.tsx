@@ -123,9 +123,9 @@ export function StocksPage({ year, currency }: StocksPageProps) {
       {loading && stocks.length === 0 && <Loader>Загружаем акции за {year}…</Loader>}
 
       <section>
-        <h2>
+        <h1>
           Акции <span className="muted">{year}</span>
-        </h2>
+        </h1>
         <ul className="rows">
           {stocks.map((s) => (
             <li key={s.id}>

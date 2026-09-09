@@ -43,7 +43,7 @@ export function Sidebar({ open, onClose, currency, onCurrencyChange }: SidebarPr
 
       <aside id="app-sidebar" className={`sidebar${open ? ' is-open' : ''}`}>
         <div className="sidebar-banner">
-          <img src="/icons/banner.webp" alt="Banner" />
+          <img src="/icons/banner.webp" alt="Whisky Index" />
         </div>
 
         <nav ref={navRef} className="sidebar-nav">
