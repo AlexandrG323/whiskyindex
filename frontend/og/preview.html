@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OG cards — Whisky Index</title>
+    <style>
+      :root {
+        --bg: #0b0b0d;
+        --text: #f2f2f4;
+        --muted: #91919c;
+        --accent: #e9922e;
+        --border: #26262b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 40px 64px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.5rem;
+      }
+
+      .lead {
+        margin: 0 0 32px;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+      }
+
+      .card-block h2 {
+        margin: 0 0 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .card-block a {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-left: 12px;
+      }
+
+      .frame-wrap {
+        width: 720px;
+        height: 378px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        background: #000;
+      }
+
+      iframe {
+        width: 1200px;
+        height: 630px;
+        border: 0;
+        transform: scale(0.6);
+        transform-origin: top left;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OG cards</h1>
+    <p class="lead">HTML templates at 1200×630, scaled to 60% for this page. Open “full size” for the real crop.</p>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      const pages = await fetch('../src/lib/seoPages.json').then((r) => r.json())
+      const grid = document.getElementById('grid')
+
+      for (const page of Object.values(pages)) {
+        const src = new URL('card.html', location.href)
+        src.searchParams.set('kicker', page.kicker)
+        src.searchParams.set('subtitle', page.ogSubtitle)
+
+        const block = document.createElement('section')
+        block.className = 'card-block'
+        block.innerHTML = `
+          <h2>${page.kicker} <a href="${src.pathname}${src.search}" target="_blank" rel="noreferrer">full size</a></h2>
+          <div class="frame-wrap">
+            <iframe title="${page.kicker}" src="${src.pathname}${src.search}"></iframe>
+          </div>
+        `
+        grid.appendChild(block)
+      }
+    </script>
+  </body>
+</html>

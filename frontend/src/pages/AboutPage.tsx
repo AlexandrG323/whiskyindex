@@ -41,7 +41,7 @@ export function AboutPage() {
     <div className="about-page">
       <header className="about-hero page-intro page-intro--hero">
         <p className="about-kicker">О проекте</p>
-        <h2>Бутылка или портфель?</h2>
+        <h1>Бутылка или портфель?</h1>
         <p className="page-intro-lead">
           Whisky Index сравнивает рост потребительской корзины с динамикой акций за выбранные годы —
           от виски и доширака до Apple и S&P 500.

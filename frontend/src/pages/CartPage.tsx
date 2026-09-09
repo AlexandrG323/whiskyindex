@@ -63,9 +63,9 @@ export function CartPage({ year, currency }: CartPageProps) {
       {loading && products.length === 0 && <Loader>Загружаем корзину за {year}…</Loader>}
 
       <section>
-        <h2>
+        <h1>
           Корзина скуфа <span className="muted">{year}</span>
-        </h2>
+        </h1>
         <ul className="grid">
           {products.map((p) => (
             <li key={p.id} className={p.price === null ? 'card card-muted' : 'card'}>

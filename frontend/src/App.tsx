@@ -5,6 +5,7 @@ import { Select } from './components/ui/Select'
 import { AppLayout } from './layout/AppLayout'
 import { getJson } from './lib/api'
 import { type Currency, loadCurrency, saveCurrency } from './lib/currency'
+import { useDocumentMeta } from './lib/useDocumentMeta'
 import { AboutPage } from './pages/AboutPage'
 import { CartPage } from './pages/CartPage'
 import { ComparePage } from './pages/ComparePage'
@@ -19,6 +20,7 @@ const YEAR_OPTIONS = YEARS.map((y) => ({ value: y, label: String(y) }))
 
 export default function App() {
   const { pathname } = useLocation()
+  useDocumentMeta(pathname)
   const showHeaderYear = pathname !== '/compare'
 
   const [year, setYear] = useState(DEFAULT_YEAR)
@@ -50,7 +52,7 @@ export default function App() {
     <header className="masthead">
       <img src="/icons/logo.webp" alt="" width={48} height={48} />
       <div>
-        <h1>Whisky Index</h1>
+        <p className="site-title">Whisky Index</p>
         <p className="muted">Бутылка или портфель?</p>
       </div>
       {showHeaderYear && (

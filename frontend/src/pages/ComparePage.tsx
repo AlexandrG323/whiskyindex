@@ -362,7 +362,7 @@ export function ComparePage({ currency }: ComparePageProps) {
   return (
     <div className={`compare-page${loading ? ' is-loading' : ''}`}>
       <header className="page-intro">
-        <h2>Что было выгоднее?</h2>
+        <h1>Что было выгоднее?</h1>
         <p className="page-intro-lead">
           Выберите период и бумаги — увидите, как они росли против корзины скуфа и на что хватило бы
           вложений сегодня.

@@ -56,11 +56,7 @@ body {
   padding: var(--page-pad);
 }
 
-h1 {
-  font-size: clamp(1.05rem, 4vw, 1.5rem);
-  margin: 0;
-}
-
+h1,
 h2 {
   font-size: 1.1rem;
   font-weight: 600;
@@ -69,6 +65,7 @@ h2 {
 
 /* A page's opening heading sits right under the chrome — the section gap
    above it is dead space, most noticeably on a phone. */
+section:first-child > h1:first-child,
 section:first-child > h2:first-child {
   margin-top: 0;
 }
@@ -82,7 +79,7 @@ section:first-child > h2:first-child {
   margin: 0 0 0.25rem;
 }
 
-.page-intro h2 {
+.page-intro h1 {
   margin: 0;
   font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
@@ -100,7 +97,7 @@ section:first-child > h2:first-child {
 }
 
 /* About leads the page rather than a section, so it gets one step more. */
-.page-intro--hero h2 {
+.page-intro--hero h1 {
   font-size: clamp(1.5rem, 3.5vw, 2rem);
   letter-spacing: -0.03em;
 }
@@ -254,6 +251,12 @@ section:first-child > h2:first-child {
 
 .select-option.is-disabled[data-active="true"] {
   background: transparent;
+}
+
+.masthead .site-title {
+  margin: 0;
+  font-size: clamp(1.05rem, 4vw, 1.5rem);
+  font-weight: 700;
 }
 
 .masthead p {
@@ -853,7 +856,7 @@ section:first-child > h2:first-child {
 
   /* Subtitle and FX rate are context, not navigation — the phone top bar
      keeps only the identity and the year control. */
-  .masthead p {
+  .masthead p.muted {
     display: none;
   }
 
