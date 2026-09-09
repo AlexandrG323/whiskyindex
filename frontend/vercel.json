@@ -4,6 +4,14 @@
       "source": "/api/:path*",
       "destination": "https://whiskyindex.fly.dev/api/:path*"
     },
+    { "source": "/cart", "destination": "/cart/index.html" },
+    { "source": "/cart/", "destination": "/cart/index.html" },
+    { "source": "/stocks", "destination": "/stocks/index.html" },
+    { "source": "/stocks/", "destination": "/stocks/index.html" },
+    { "source": "/compare", "destination": "/compare/index.html" },
+    { "source": "/compare/", "destination": "/compare/index.html" },
+    { "source": "/about", "destination": "/about/index.html" },
+    { "source": "/about/", "destination": "/about/index.html" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
